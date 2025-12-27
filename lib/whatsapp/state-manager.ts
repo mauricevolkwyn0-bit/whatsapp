@@ -1,5 +1,5 @@
 // lib/whatsapp/state-manager.ts
-import { supabaseServer } from '@/lib/supabase/server'
+import { getSupabaseServer } from '@/lib/supabase/server'
 
 // ═══════════════════════════════════════════════════════════════
 // CONVERSATION STATES
@@ -103,7 +103,9 @@ export interface StateData {
 // ═══════════════════════════════════════════════════════════════
 export async function getConversationState(whatsappNumber: string) {
   try {
-    const { data, error } = await supabaseServer
+    const supabase = getSupabaseServer() // ✅ Create client here
+    
+    const { data, error } = await supabase
       .from('whatsapp_conversation_states')
       .select('*')
       .eq('whatsapp_number', whatsappNumber)
@@ -130,7 +132,9 @@ export async function updateConversationState(
   data: StateData = {}
 ) {
   try {
-    const { error } = await supabaseServer
+    const supabase = getSupabaseServer() // ✅ Create client here
+    
+    const { error } = await supabase
       .from('whatsapp_conversation_states')
       .upsert(
         {
@@ -156,6 +160,7 @@ export async function updateConversationState(
     throw error
   }
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 // UPDATE STATE DATA (Keep current state, update data only)
@@ -192,7 +197,9 @@ export async function updateStateData(
 // ═══════════════════════════════════════════════════════════════
 export async function clearConversationState(whatsappNumber: string) {
   try {
-    const { error } = await supabaseServer
+    const supabase = getSupabaseServer() // ✅ Create client here
+    
+    const { error } = await supabase
       .from('whatsapp_conversation_states')
       .delete()
       .eq('whatsapp_number', whatsappNumber)
@@ -327,10 +334,12 @@ export function isReviewState(state: ConversationState): boolean {
 // ═══════════════════════════════════════════════════════════════
 export async function cleanupOldStates(daysOld: number = 7) {
   try {
+    const supabase = getSupabaseServer() // ✅ Create client here
+    
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - daysOld)
 
-    const { error } = await supabaseServer
+    const { error } = await supabase
       .from('whatsapp_conversation_states')
       .delete()
       .lt('last_message_at', cutoffDate.toISOString())

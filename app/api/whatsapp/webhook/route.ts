@@ -1,6 +1,6 @@
 // app/api/whatsapp/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/lib/supabase/server'
+import { getSupabaseServer } from '@/lib/supabase/server'
 import { 
   sendTextMessage, 
   sendInteractiveButtons,
@@ -375,7 +375,8 @@ async function handleClientRegVerification(from: string, code: string, stateData
 
   // Create user in database
   try {
-    const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
+    const supabase = getSupabaseServer()
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: stateData.email,
       phone: from,
       email_confirm: true,
@@ -392,9 +393,8 @@ async function handleClientRegVerification(from: string, code: string, stateData
     })
 
     if (authError) throw authError
-
     // Create client profile
-    const { error: profileError } = await supabaseServer
+    const { error: profileError } = await supabase
       .from('client_profiles')
       .insert({
         user_id: authData.user.id,
@@ -585,7 +585,8 @@ Send images or type 'skip'`
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
 async function getUserByWhatsApp(phone: string) {
-  const { data, error } = await supabaseServer
+    const supabase = getSupabaseServer()
+    const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('phone', phone)
@@ -600,7 +601,8 @@ async function getUserByWhatsApp(phone: string) {
 }
 
 async function logMessage(from: string, text: string, type: string) {
-  await supabaseServer.from('whatsapp_messages').insert({
+  const supabase = getSupabaseServer()        
+  await supabase.from('whatsapp_messages').insert({
     whatsapp_number: from,
     message_text: text,
     message_type: type,
