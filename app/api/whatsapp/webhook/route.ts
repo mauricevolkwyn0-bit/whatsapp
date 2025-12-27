@@ -192,8 +192,8 @@ Let's get you registered!
 
 *Are you:*`,
       [
-        { id: 'client', title: '🙋 Client - I need services' },
-        { id: 'provider', title: '🔧 Provider - I offer services' }
+        { id: 'client', title: '🙋  I need services' },
+        { id: 'provider', title: '🔧 I offer services' }
       ]
     )
     return
@@ -587,7 +587,7 @@ Send images or type 'skip'`
 async function getUserByWhatsApp(phone: string) {
     const supabase = getSupabaseServer()
     const { data, error } = await supabase
-    .from('users')
+    .from('profiles')
     .select('*')
     .eq('phone', phone)
     .maybeSingle()
