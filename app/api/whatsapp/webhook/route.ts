@@ -247,7 +247,7 @@ async function handleCategorySelected(from: string, categorySlug: string, stateD
   // Fetch category details from database
   const supabase = getSupabaseServer()
   const { data: category, error } = await supabase
-    .from('categories')
+    .from('job_categories')
     .select('*')
     .eq('slug', categorySlug)
     .single()
