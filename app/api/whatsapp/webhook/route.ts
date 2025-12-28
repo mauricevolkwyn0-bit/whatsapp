@@ -582,35 +582,77 @@ What's your first name?`
 // JOB POSTING FLOW
 // ═══════════════════════════════════════════════════════════════
 async function startJobPosting(from: string, stateData: any) {
-    // Check if user is registered
-    const user = await getUserByWhatsApp(from)
+  // Check if user is registered
+  const user = await getUserByWhatsApp(from)
 
-    if (!user) {
-        await sendTextMessage(from, `Please register first! Type 'MENU' to get started.`)
-        return
-    }
+  console.log('🔍 startJobPosting - user check:', {
+    from,
+    userFound: !!user,
+    userId: user?.id,
+    userType: user?.user_metadata?.user_type
+  })
 
-    if (user.user_metadata?.user_type !== 'client') {
-        await sendTextMessage(from,
-            `Only clients can post jobs. Type 'MENU' to see your options.`)
-        return
-    }
+  if (!user) {
+    await sendTextMessage(from, `Please register first! Type 'MENU' to get started.`)
+    return
+  }
 
-    await updateConversationState(from, 'POSTING_JOB_TITLE', {
-        userId: user.id
-    })
-
+  if (user.user_metadata?.user_type !== 'client') {
     await sendTextMessage(from,
-        `📝 *Let's post your job!*
+      `Only clients can post jobs. Type 'MENU' to see your options.`)
+    return
+  }
 
-What service do you need?
+  await updateConversationState(from, 'SELECTING_JOB_CATEGORY', {
+    userId: user.id,
+    userType: 'client'
+  })
 
-Examples:
-• Fix leaking tap
-• Paint bedroom
-• Repair gate
-• Clean house`
-    )
+  // Show category selection list
+  await sendInteractiveList(from,
+    `📝 *Let's post your job!*
+
+What type of service do you need?`,
+    'Choose Category',
+    [
+      {
+        title: '🏠 Home & Property',
+        rows: [
+          { id: 'general-handyman', title: 'General Handyman', description: 'Small repairs & fixes' },
+          { id: 'plumbing', title: 'Plumbing', description: 'Taps, pipes, geysers' },
+          { id: 'electrical-power', title: 'Electrical & Power', description: 'Wiring, lighting, plugs' },
+          { id: 'painting-decorating', title: 'Painting', description: 'Interior & exterior' },
+          { id: 'cleaning-services', title: 'Cleaning', description: 'Home & office cleaning' },
+          { id: 'home-improvements-renovations', title: 'Renovations', description: 'Building projects' }
+        ]
+      },
+      {
+        title: '🔧 Installation & Assembly',
+        rows: [
+          { id: 'furniture-assembly-repairs', title: 'Furniture Assembly', description: 'Flat-pack & repairs' },
+          { id: 'appliance-installations', title: 'Appliance Install', description: 'Stoves, gates, motors' }
+        ]
+      },
+      {
+        title: '🚗 Automotive',
+        rows: [
+          { id: 'car-mechanic', title: 'Car Mechanic', description: 'Services & repairs' },
+          { id: 'panelbeating', title: 'Panelbeating', description: 'Dent repairs & bodywork' }
+        ]
+      },
+      {
+        title: '👥 Personal & Professional',
+        rows: [
+          { id: 'moving-transport', title: 'Moving & Transport', description: 'Bakkie & truck hire' },
+          { id: 'it-tech-support', title: 'IT & Tech Support', description: 'WiFi, networking, laptops' },
+          { id: 'lessons-tutoring', title: 'Lessons & Tutoring', description: 'School & skills training' },
+          { id: 'care-wellness', title: 'Care & Wellness', description: 'Babysitting, elderly care' },
+          { id: 'events-catering', title: 'Events & Catering', description: 'Parties & special occasions' },
+          { id: 'dog-breeding', title: 'Dog Breeding', description: 'Puppies & stud services' }
+        ]
+      }
+    ]
+  )
 }
 
 async function handleJobTitle(from: string, title: string, stateData: any) {
