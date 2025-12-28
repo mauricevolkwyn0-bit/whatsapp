@@ -13,6 +13,7 @@ import {
   ConversationState 
 } from '@/lib/whatsapp/state-manager'
 import { isValidEmail, sanitizeInput, parseBudget } from '@/lib/utils/validation'
+import { sendVerificationEmail, sendWelcomeEmail } from '@/lib/email/mailgun'
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'just_work_verify_2025'
 
@@ -345,23 +346,29 @@ async function handleClientRegEmail(from: string, email: string, stateData: any)
     return
   }
 
-  // Generate 6-digit verification code
   const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
 
-  // TODO: Send verification email
-  console.log(`Verification code for ${emailLower}: ${verificationCode}`)
+  try {
+    // Send verification email via Mailgun
+    await sendVerificationEmail(emailLower, verificationCode, stateData.first_name)
 
-  await updateConversationState(from, 'CLIENT_REG_VERIFICATION', {
-    ...stateData,
-    email: emailLower,
-    verification_code: verificationCode
-  })
+    await updateConversationState(from, 'CLIENT_REG_VERIFICATION', {
+      ...stateData,
+      email: emailLower,
+      verification_code: verificationCode,
+      verification_expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    })
 
-  await sendTextMessage(from,
-    `📧 Verification code sent to ${emailLower}
+    await sendTextMessage(from,
+      `📧 Verification code sent to ${emailLower}
 
-Enter the 6-digit code:`
-  )
+Enter the 6-digit code (valid for 10 minutes):`
+    )
+  } catch (error) {
+    console.error('Error sending verification email:', error)
+    await sendTextMessage(from,
+      `❌ Failed to send email. Please check your email address and try again.`)
+  }
 }
 
 async function handleClientRegVerification(from: string, code: string, stateData: any) {
