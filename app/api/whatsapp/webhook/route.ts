@@ -410,90 +410,137 @@ async function handleClientRegVerification(from: string, code: string, stateData
 
     const supabase = getSupabaseServer()
     
-    // Step 1: Create auth user
-    console.log('📝 Creating auth user...')
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: stateData.email,
-      phone: from,
-      email_confirm: true,
-      phone_confirm: true,
-      user_metadata: {
-        user_type: 'client',
-        first_name: stateData.first_name,
-        surname: stateData.surname,
-        full_name: `${stateData.first_name} ${stateData.surname}`,
-        whatsapp_number: from,
-        registered_via: 'whatsapp',
-        registered_at: new Date().toISOString()
+    // Check if user already exists
+    const { data: existingUsers } = await supabase.auth.admin.listUsers()
+    const existingUser = existingUsers?.users.find(
+      u => u.email === stateData.email || u.phone === from
+    )
+
+    let userId: string
+
+    if (existingUser) {
+      console.log('⚠️ User already exists:', existingUser.id)
+      userId = existingUser.id
+
+      // Update user metadata if needed
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        existingUser.id,
+        {
+          user_metadata: {
+            user_type: 'client',
+            first_name: stateData.first_name,
+            surname: stateData.surname,
+            full_name: `${stateData.first_name} ${stateData.surname}`,
+            whatsapp_number: from,
+            registered_via: 'whatsapp',
+            registered_at: existingUser.created_at
+          }
+        }
+      )
+
+      if (updateError) {
+        console.error('⚠️ Could not update user metadata:', updateError)
       }
-    })
 
-    if (authError) {
-      console.error('❌ Auth error:', {
-        message: authError.message,
-        status: authError.status,
-        code: authError.code,
-        details: authError
+    } else {
+      // Create new auth user
+      console.log('📝 Creating new auth user...')
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: stateData.email,
+        phone: from,
+        email_confirm: true,
+        phone_confirm: true,
+        user_metadata: {
+          user_type: 'client',
+          first_name: stateData.first_name,
+          surname: stateData.surname,
+          full_name: `${stateData.first_name} ${stateData.surname}`,
+          whatsapp_number: from,
+          registered_via: 'whatsapp',
+          registered_at: new Date().toISOString()
+        }
       })
-      throw authError
+
+      if (authError) {
+        console.error('❌ Auth error:', {
+          message: authError.message,
+          status: authError.status,
+          code: authError.code,
+          details: authError
+        })
+        throw authError
+      }
+
+      if (!authData || !authData.user) {
+        console.error('❌ No auth data returned')
+        throw new Error('No user data returned from auth')
+      }
+
+      userId = authData.user.id
+      console.log('✅ Auth user created:', userId)
     }
 
-    if (!authData || !authData.user) {
-      console.error('❌ No auth data returned')
-      throw new Error('No user data returned from auth')
-    }
-
-    console.log('✅ Auth user created:', authData.user.id)
-
-    // Step 2: Create client profile
-    console.log('📝 Creating client profile...')
-    const { data: profileData, error: profileError } = await supabase
+    // Check if client profile exists
+    const { data: existingProfile } = await supabase
       .from('client_profiles')
-      .insert({
-        user_id: authData.user.id,
-        total_jobs_posted: 0,
-        total_jobs_completed: 0,
-        total_spent: 0
-      })
-      .select()
+      .select('*')
+      .eq('user_id', userId)
+      .single()
 
-    if (profileError) {
-      console.error('❌ Profile error:', {
-        message: profileError.message,
-        code: profileError.code,
-        details: profileError.details,
-        hint: profileError.hint,
-        error: profileError
-      })
-      throw profileError
+    if (!existingProfile) {
+      // Create client profile
+      console.log('📝 Creating client profile...')
+      const { data: profileData, error: profileError } = await supabase
+        .from('client_profiles')
+        .insert({
+          user_id: userId,
+          total_jobs_posted: 0,
+          total_jobs_completed: 0,
+          total_spent: 0
+        })
+        .select()
+
+      if (profileError) {
+        console.error('❌ Profile error:', {
+          message: profileError.message,
+          code: profileError.code,
+          details: profileError.details,
+          hint: profileError.hint,
+          error: profileError
+        })
+        throw profileError
+      }
+
+      console.log('✅ Client profile created:', profileData)
+    } else {
+      console.log('✅ Client profile already exists')
     }
 
-    console.log('✅ Client profile created:', profileData)
-
-    // Step 3: Update conversation state
+    // Update conversation state
     console.log('📝 Updating conversation state...')
     await updateConversationState(from, 'IDLE', {
-      userId: authData.user.id,
+      userId: userId,
       userType: 'client'
     })
 
     console.log('✅ Registration completed successfully!')
 
-    // Send welcome email
-    try {
-      await sendWelcomeEmail(
-        stateData.email,
-        stateData.first_name,
-        'client'
-      )
-    } catch (emailError) {
-      console.error('⚠️ Welcome email failed (non-critical):', emailError)
-      // Don't fail registration if welcome email fails
+    // Send welcome email (only if new user)
+    if (!existingUser) {
+      try {
+        await sendWelcomeEmail(
+          stateData.email,
+          stateData.first_name,
+          'client'
+        )
+      } catch (emailError) {
+        console.error('⚠️ Welcome email failed (non-critical):', emailError)
+      }
     }
 
     // Registration complete
     await sendTextMessage(from,
-      `🎉 *Registration complete!*
+      `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
 
 Welcome ${stateData.first_name}! You can now:
 
