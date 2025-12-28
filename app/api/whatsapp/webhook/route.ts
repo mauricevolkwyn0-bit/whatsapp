@@ -384,184 +384,183 @@ Enter the 6-digit code (valid for 10 minutes):`
 }
 
 async function handleClientRegVerification(from: string, code: string, stateData: any) {
-    const codeClean = code.trim()
+  const codeClean = code.trim()
 
-    console.log('🔐 Verification attempt:', {
-        from,
-        providedCode: codeClean,
-        expectedCode: stateData.verification_code,
-        match: codeClean === stateData.verification_code
+  console.log('🔐 Verification attempt:', {
+    from,
+    providedCode: codeClean,
+    expectedCode: stateData.verification_code,
+    match: codeClean === stateData.verification_code
+  })
+
+  if (codeClean !== stateData.verification_code) {
+    await sendTextMessage(from,
+      `❌ Invalid code. Please try again or type 'MENU' to start over.`)
+    return
+  }
+
+  // Create user in database
+  try {
+    console.log('👤 Starting user creation:', {
+      email: stateData.email,
+      phone: from,
+      first_name: stateData.first_name,
+      surname: stateData.surname
     })
 
-    if (codeClean !== stateData.verification_code) {
-        await sendTextMessage(from,
-            `❌ Invalid code. Please try again or type 'MENU' to start over.`)
-        return
-    }
+    const supabase = getSupabaseServer()
+    
+    // Check if user already exists
+    const { data: existingUsers } = await supabase.auth.admin.listUsers()
+    const existingUser = existingUsers?.users.find(
+      u => u.email === stateData.email || u.phone === from
+    )
 
-    // Create user in database
-    try {
-        console.log('👤 Starting user creation:', {
-            email: stateData.email,
-            phone: from,
+    let userId: string
+
+    if (existingUser) {
+      console.log('⚠️ User already exists:', existingUser.id)
+      userId = existingUser.id
+
+      // Update user metadata if needed
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        existingUser.id,
+        {
+          user_metadata: {
+            user_type: 'client',
             first_name: stateData.first_name,
-            surname: stateData.surname
-        })
-
-        const supabase = getSupabaseServer()
-
-        // Check if user already exists
-        const { data: existingUsers } = await supabase.auth.admin.listUsers()
-        const existingUser = existingUsers?.users.find(
-            u => u.email === stateData.email || u.phone === from
-        )
-
-        let userId: string
-
-        if (existingUser) {
-            console.log('⚠️ User already exists:', existingUser.id)
-            userId = existingUser.id
-
-            // Update user metadata if needed
-            const { error: updateError } = await supabase.auth.admin.updateUserById(
-                existingUser.id,
-                {
-                    user_metadata: {
-                        user_type: 'client',
-                        first_name: stateData.first_name,
-                        surname: stateData.surname,
-                        full_name: `${stateData.first_name} ${stateData.surname}`,
-                        whatsapp_number: from,
-                        registered_via: 'whatsapp',
-                        registered_at: existingUser.created_at
-                    }
-                }
-            )
-
-            if (updateError) {
-                console.error('⚠️ Could not update user metadata:', updateError)
-            }
-
-        } else {
-            // Create new auth user
-            console.log('📝 Creating new auth user...')
-            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-                email: stateData.email,
-                phone: from,
-                email_confirm: true,
-                phone_confirm: true,
-                user_metadata: {
-                    user_type: 'client',
-                    first_name: stateData.first_name,
-                    surname: stateData.surname,
-                    full_name: `${stateData.first_name} ${stateData.surname}`,
-                    whatsapp_number: from,
-                    registered_via: 'whatsapp',
-                    registered_at: new Date().toISOString()
-                }
-            })
-
-            if (authError) {
-                console.error('❌ Auth error:', {
-                    message: authError.message,
-                    status: authError.status,
-                    code: authError.code,
-                    details: authError
-                })
-                throw authError
-            }
-
-            if (!authData || !authData.user) {
-                console.error('❌ No auth data returned')
-                throw new Error('No user data returned from auth')
-            }
-
-            userId = authData.user.id
-            console.log('✅ Auth user created:', userId)
+            surname: stateData.surname,
+            full_name: `${stateData.first_name} ${stateData.surname}`,
+            whatsapp_number: from,
+            registered_via: 'whatsapp',
+            registered_at: existingUser.created_at
+          }
         }
+      )
 
-        // Check if client profile exists
-        const { data: existingProfile } = await supabase
-            .from('client_profiles')
-            .select('*')
-            .eq('user_id', userId)
-            .single()
+      if (updateError) {
+        console.error('⚠️ Could not update user metadata:', updateError)
+      }
 
-        if (!existingProfile) {
-            // Create client profile
-            console.log('📝 Creating client profile...')
-            const { data: profileData, error: profileError } = await supabase
-                .from('client_profiles')
-                .insert({
-                    user_id: userId,
-                    total_jobs_posted: 0,
-                    total_jobs_completed: 0,
-                    total_spent: 0
-                })
-                .select()
-
-            if (profileError) {
-                console.error('❌ Profile error:', {
-                    message: profileError.message,
-                    code: profileError.code,
-                    details: profileError.details,
-                    hint: profileError.hint,
-                    error: profileError
-                })
-                throw profileError
-            }
-
-            console.log('✅ Client profile created:', profileData)
-        } else {
-            console.log('✅ Client profile already exists')
+    } else {
+      // Create new auth user
+      console.log('📝 Creating new auth user...')
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: stateData.email,
+        phone: from,
+        email_confirm: true,
+        phone_confirm: true,
+        user_metadata: {
+          user_type: 'client',
+          first_name: stateData.first_name,
+          surname: stateData.surname,
+          full_name: `${stateData.first_name} ${stateData.surname}`,
+          whatsapp_number: from,
+          registered_via: 'whatsapp',
+          registered_at: new Date().toISOString()
         }
+      })
 
-        // Update conversation state
-        console.log('📝 Updating conversation state...')
-        await updateConversationState(from, 'IDLE', {
-            userId: userId,
-            userType: 'client'
+      if (authError) {
+        console.error('❌ Auth error:', {
+          message: authError.message,
+          status: authError.status,
+          code: authError.code,
+          details: authError
         })
+        throw authError
+      }
 
-        console.log('✅ Registration completed successfully!')
+      if (!authData || !authData.user) {
+        console.error('❌ No auth data returned')
+        throw new Error('No user data returned from auth')
+      }
 
-        // Send welcome email (only if new user)
-        if (!existingUser) {
-            try {
-                await sendWelcomeEmail(
-                    stateData.email,
-                    stateData.first_name,
-                    'client'
-                )
-            } catch (emailError) {
-                console.error('⚠️ Welcome email failed (non-critical):', emailError)
-            }
-        }
-
-        // Registration complete
-        await sendTextMessage(from,
-            `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
-
-            Welcome ${stateData.first_name}! You can now:
-
-            - *POST JOB* - Find a service provider
-            - *MY JOBS* - View your jobs
-            - *HISTORY* - Past jobs
-
-            What would you like to do?`
-        )
-
-    } catch (error) {
-        console.error('❌ REGISTRATION FAILED:', error)
-        console.error('Error details:', {
-            message: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined,
-            error: error
-        })
-
-        await sendTextMessage(from,
-            `❌ Registration failed. Please try again later or contact support.`)
+      userId = authData.user.id
+      console.log('✅ Auth user created:', userId)
     }
+
+    // Check if client profile exists
+    const { data: existingProfile } = await supabase
+      .from('client_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (!existingProfile) {
+      // Create client profile
+      console.log('📝 Creating client profile...')
+      const { data: profileData, error: profileError } = await supabase
+        .from('client_profiles')
+        .insert({
+          user_id: userId,
+          total_jobs_posted: 0,
+          total_jobs_completed: 0,
+          total_spent: 0
+        })
+        .select()
+
+      if (profileError) {
+        console.error('❌ Profile error:', {
+          message: profileError.message,
+          code: profileError.code,
+          details: profileError.details,
+          hint: profileError.hint,
+          error: profileError
+        })
+        throw profileError
+      }
+
+      console.log('✅ Client profile created:', profileData)
+    } else {
+      console.log('✅ Client profile already exists')
+    }
+
+    // Update conversation state
+    console.log('📝 Updating conversation state...')
+    await updateConversationState(from, 'IDLE', {
+      userId: userId,
+      userType: 'client'
+    })
+
+    console.log('✅ Registration completed successfully!')
+
+    // Send welcome email (only if new user)
+    if (!existingUser) {
+      try {
+        await sendWelcomeEmail(
+          stateData.email,
+          stateData.first_name,
+          'client'
+        )
+      } catch (emailError) {
+        console.error('⚠️ Welcome email failed (non-critical):', emailError)
+      }
+    }
+
+    // Registration complete - SHOW INTERACTIVE BUTTONS
+    await sendInteractiveButtons(from,
+      `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
+
+Welcome ${stateData.first_name}! You can now:`,
+      [
+        { id: 'post_job', title: '📝 Post a Job' },
+        { id: 'my_jobs', title: '📋 My Jobs' },
+        { id: 'history', title: '📊 History' }
+      ]
+    )
+
+  } catch (error) {
+    console.error('❌ REGISTRATION FAILED:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error: error
+    })
+    
+    await sendTextMessage(from,
+      `❌ Registration failed. Please try again later or contact support.`)
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
