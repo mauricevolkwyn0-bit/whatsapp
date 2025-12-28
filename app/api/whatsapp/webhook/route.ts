@@ -243,6 +243,38 @@ What would you like to do?`,
     }
 }
 
+async function handleCategorySelected(from: string, categorySlug: string, stateData: any) {
+  // Fetch category details from database
+  const supabase = getSupabaseServer()
+  const { data: category, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('slug', categorySlug)
+    .single()
+
+  if (error || !category) {
+    console.error('❌ Category fetch error:', error)
+    await sendTextMessage(from, `❌ Category not found. Please try again.`)
+    await startJobPosting(from, stateData)
+    return
+  }
+
+  console.log('✅ Category selected:', category.name)
+
+  await updateConversationState(from, 'POSTING_JOB_TITLE', {
+    ...stateData,
+    category_id: category.id,
+    category_name: category.name
+  })
+
+  await sendTextMessage(from,
+    `Great! *${category.name}*
+
+Now, briefly describe what you need done:
+
+Example: "Fix leaking kitchen tap" or "Paint bedroom walls white"`)
+}
+
 // ═══════════════════════════════════════════════════════════════
 // HANDLE INTERACTIVE MESSAGES (Button clicks)
 // ═══════════════════════════════════════════════════════════════
@@ -255,8 +287,27 @@ async function handleInteractiveMessage(
     const buttonId = message.interactive?.button_reply?.id ||
         message.interactive?.list_reply?.id
 
-    console.log(`Button clicked: ${buttonId}`)
+    console.log(`Button/List clicked: ${buttonId} (state: ${currentState})`)
 
+    // ─────────────────────────────────────────────────────────
+    // HANDLE CATEGORY SELECTION (must come BEFORE switch)
+    // ─────────────────────────────────────────────────────────
+    if (currentState === 'SELECTING_JOB_CATEGORY') {
+        if (buttonId === 'more-categories') {
+            await showMoreCategories(from, stateData)
+            return
+        }
+        if (buttonId === 'back-to-main') {
+            await startJobPosting(from, stateData)
+            return
+        }
+        await handleCategorySelected(from, buttonId, stateData)
+        return
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // HANDLE ALL OTHER BUTTON CLICKS
+    // ─────────────────────────────────────────────────────────
     switch (buttonId) {
         // ─────────────────────────────────────────────────────────
         // USER TYPE SELECTION (NEW USERS)
@@ -608,7 +659,7 @@ async function startJobPosting(from: string, stateData: any) {
     userType: 'client'
   })
 
-  // Show category selection list
+  // Show TOP 9 categories + "More categories" option
   await sendInteractiveList(from,
     `📝 *Let's post your job!*
 
@@ -616,39 +667,57 @@ What type of service do you need?`,
     'Choose Category',
     [
       {
-        title: '🏠 Home & Property',
+        title: '🏠 Popular Services',
         rows: [
           { id: 'general-handyman', title: 'General Handyman', description: 'Small repairs & fixes' },
           { id: 'plumbing', title: 'Plumbing', description: 'Taps, pipes, geysers' },
-          { id: 'electrical-power', title: 'Electrical & Power', description: 'Wiring, lighting, plugs' },
+          { id: 'electrical-power', title: 'Electrical', description: 'Wiring, lighting' },
           { id: 'painting-decorating', title: 'Painting', description: 'Interior & exterior' },
-          { id: 'cleaning-services', title: 'Cleaning', description: 'Home & office cleaning' },
-          { id: 'home-improvements-renovations', title: 'Renovations', description: 'Building projects' }
+          { id: 'cleaning-services', title: 'Cleaning', description: 'Home & office' },
+          { id: 'home-improvements-renovations', title: 'Renovations', description: 'Building work' }
         ]
       },
       {
-        title: '🔧 Installation & Assembly',
+        title: '🔧 Other Services',
+        rows: [
+          { id: 'car-mechanic', title: 'Car Mechanic', description: 'Services & repairs' },
+          { id: 'moving-transport', title: 'Moving', description: 'Bakkie & truck hire' },
+          { id: 'more-categories', title: '➕ More Categories', description: 'See all services' }
+        ]
+      }
+    ]
+  )
+}
+
+async function showMoreCategories(from: string, stateData: any) {
+  await sendInteractiveList(from,
+    `📋 *More Categories*
+
+Choose a service category:`,
+    'Choose Category',
+    [
+      {
+        title: '🏠 Home Services',
         rows: [
           { id: 'furniture-assembly-repairs', title: 'Furniture Assembly', description: 'Flat-pack & repairs' },
-          { id: 'appliance-installations', title: 'Appliance Install', description: 'Stoves, gates, motors' }
+          { id: 'appliance-installations', title: 'Appliance Install', description: 'Stoves, gates' }
         ]
       },
       {
         title: '🚗 Automotive',
         rows: [
-          { id: 'car-mechanic', title: 'Car Mechanic', description: 'Services & repairs' },
-          { id: 'panelbeating', title: 'Panelbeating', description: 'Dent repairs & bodywork' }
+          { id: 'panelbeating', title: 'Panelbeating', description: 'Dent repairs' }
         ]
       },
       {
-        title: '👥 Personal & Professional',
+        title: '👥 Personal Services',
         rows: [
-          { id: 'moving-transport', title: 'Moving & Transport', description: 'Bakkie & truck hire' },
-          { id: 'it-tech-support', title: 'IT & Tech Support', description: 'WiFi, networking, laptops' },
-          { id: 'lessons-tutoring', title: 'Lessons & Tutoring', description: 'School & skills training' },
-          { id: 'care-wellness', title: 'Care & Wellness', description: 'Babysitting, elderly care' },
-          { id: 'events-catering', title: 'Events & Catering', description: 'Parties & special occasions' },
-          { id: 'dog-breeding', title: 'Dog Breeding', description: 'Puppies & stud services' }
+          { id: 'it-tech-support', title: 'IT & Tech', description: 'WiFi, networking' },
+          { id: 'lessons-tutoring', title: 'Tutoring', description: 'School & skills' },
+          { id: 'care-wellness', title: 'Care & Wellness', description: 'Babysitting, care' },
+          { id: 'events-catering', title: 'Events', description: 'Parties & catering' },
+          { id: 'dog-breeding', title: 'Dog Breeding', description: 'Puppies & studs' },
+          { id: 'back-to-main', title: '⬅️ Back', description: 'Main categories' }
         ]
       }
     ]
