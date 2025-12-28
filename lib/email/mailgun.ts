@@ -16,7 +16,19 @@ export async function sendVerificationEmail(
   firstName: string
 ) {
   try {
-    const result = await mg.messages.create(process.env.MAILGUN_DOMAIN || '', {
+    // Enhanced logging for debugging
+    console.log('📧 Mailgun Config Check:', {
+      domain: process.env.MAILGUN_DOMAIN,
+      hasApiKey: !!process.env.MAILGUN_API_KEY,
+      apiKeyLength: process.env.MAILGUN_API_KEY?.length,
+      apiKeyPrefix: process.env.MAILGUN_API_KEY?.substring(0, 8),
+      fromEmail: process.env.MAILGUN_FROM_EMAIL,
+      to: to,
+      firstName: firstName,
+      code: code
+    })
+
+    const messageData = {
       from: `JUST WORK <${process.env.MAILGUN_FROM_EMAIL || 'noreply@justwork.co.za'}>`,
       to: [to],
       subject: 'Your JUST WORK Verification Code',
@@ -159,12 +171,34 @@ Web: justwork.co.za
 
 © ${new Date().getFullYear()} JUST WORK
       `.trim()
-    })
+    }
+
+    console.log('📤 Sending message with from:', messageData.from)
+    console.log('📤 Using domain:', process.env.MAILGUN_DOMAIN)
+    
+    const result = await mg.messages.create(
+      process.env.MAILGUN_DOMAIN || '', 
+      messageData
+    )
 
     console.log('✅ Verification email sent via Mailgun:', result)
     return result
   } catch (error) {
     console.error('❌ Mailgun error:', error)
+    
+    // Detailed error logging
+    if (error && typeof error === 'object') {
+      console.error('❌ Error details:', {
+        message: (error as any).message,
+        status: (error as any).status,
+        statusCode: (error as any).statusCode,
+        details: (error as any).details,
+        body: (error as any).body,
+        response: (error as any).response,
+        stack: (error as any).stack
+      })
+    }
+    
     throw error
   }
 }
@@ -180,6 +214,8 @@ export async function sendWelcomeEmail(
     : 'You can now browse jobs and start earning by offering your services.'
 
   try {
+    console.log('📧 Sending welcome email to:', to)
+    
     const result = await mg.messages.create(process.env.MAILGUN_DOMAIN || '', {
       from: `JUST WORK <${process.env.MAILGUN_FROM_EMAIL || 'noreply@justwork.co.za'}>`,
       to: [to],
@@ -252,6 +288,15 @@ export async function sendWelcomeEmail(
     return result
   } catch (error) {
     console.error('❌ Failed to send welcome email:', error)
+    
+    if (error && typeof error === 'object') {
+      console.error('❌ Welcome email error details:', {
+        message: (error as any).message,
+        status: (error as any).status,
+        details: (error as any).details
+      })
+    }
+    
     // Don't throw - welcome email is optional
   }
 }
