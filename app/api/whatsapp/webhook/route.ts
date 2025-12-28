@@ -718,19 +718,27 @@ Send images or type 'skip'`
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
 async function getUserByWhatsApp(phone: string) {
-    const supabase = getSupabaseServer()
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('phone', phone)
-        .maybeSingle()
-
-    if (error) {
-        console.error('Error fetching user:', error)
-        return null
-    }
-
-    return data
+  const supabase = getSupabaseServer()
+  
+  // Get user from Supabase Auth
+  const { data: { users }, error } = await supabase.auth.admin.listUsers()
+  
+  if (error) {
+    console.error('Error fetching users:', error)
+    return null
+  }
+  
+  // Find user by phone number
+  const user = users?.find(u => u.phone === phone)
+  
+  console.log('👤 getUserByWhatsApp result:', {
+    phone,
+    found: !!user,
+    userId: user?.id,
+    userType: user?.user_metadata?.user_type
+  })
+  
+  return user || null
 }
 
 async function logMessage(from: string, text: string, type: string) {
