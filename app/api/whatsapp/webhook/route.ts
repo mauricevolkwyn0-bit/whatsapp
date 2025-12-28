@@ -386,6 +386,13 @@ Enter the 6-digit code (valid for 10 minutes):`
 async function handleClientRegVerification(from: string, code: string, stateData: any) {
   const codeClean = code.trim()
 
+  console.log('🔐 Verification attempt:', {
+    from,
+    providedCode: codeClean,
+    expectedCode: stateData.verification_code,
+    match: codeClean === stateData.verification_code
+  })
+
   if (codeClean !== stateData.verification_code) {
     await sendTextMessage(from,
       `❌ Invalid code. Please try again or type 'MENU' to start over.`)
@@ -394,7 +401,17 @@ async function handleClientRegVerification(from: string, code: string, stateData
 
   // Create user in database
   try {
+    console.log('👤 Starting user creation:', {
+      email: stateData.email,
+      phone: from,
+      first_name: stateData.first_name,
+      surname: stateData.surname
+    })
+
     const supabase = getSupabaseServer()
+    
+    // Step 1: Create auth user
+    console.log('📝 Creating auth user...')
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: stateData.email,
       phone: from,
@@ -411,9 +428,26 @@ async function handleClientRegVerification(from: string, code: string, stateData
       }
     })
 
-    if (authError) throw authError
-    // Create client profile
-    const { error: profileError } = await supabase
+    if (authError) {
+      console.error('❌ Auth error:', {
+        message: authError.message,
+        status: authError.status,
+        code: authError.code,
+        details: authError
+      })
+      throw authError
+    }
+
+    if (!authData || !authData.user) {
+      console.error('❌ No auth data returned')
+      throw new Error('No user data returned from auth')
+    }
+
+    console.log('✅ Auth user created:', authData.user.id)
+
+    // Step 2: Create client profile
+    console.log('📝 Creating client profile...')
+    const { data: profileData, error: profileError } = await supabase
       .from('client_profiles')
       .insert({
         user_id: authData.user.id,
@@ -421,29 +455,63 @@ async function handleClientRegVerification(from: string, code: string, stateData
         total_jobs_completed: 0,
         total_spent: 0
       })
+      .select()
 
-    if (profileError) throw profileError
+    if (profileError) {
+      console.error('❌ Profile error:', {
+        message: profileError.message,
+        code: profileError.code,
+        details: profileError.details,
+        hint: profileError.hint,
+        error: profileError
+      })
+      throw profileError
+    }
 
-    // Registration complete
+    console.log('✅ Client profile created:', profileData)
+
+    // Step 3: Update conversation state
+    console.log('📝 Updating conversation state...')
     await updateConversationState(from, 'IDLE', {
       userId: authData.user.id,
       userType: 'client'
     })
 
+    console.log('✅ Registration completed successfully!')
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(
+        stateData.email,
+        stateData.first_name,
+        'client'
+      )
+    } catch (emailError) {
+      console.error('⚠️ Welcome email failed (non-critical):', emailError)
+      // Don't fail registration if welcome email fails
+    }
+
+    // Registration complete
     await sendTextMessage(from,
       `🎉 *Registration complete!*
 
 Welcome ${stateData.first_name}! You can now:
 
-• *POST JOB* - Find a service provider
-• *MY JOBS* - View your jobs
-• *HISTORY* - Past jobs
+- *POST JOB* - Find a service provider
+- *MY JOBS* - View your jobs
+- *HISTORY* - Past jobs
 
 What would you like to do?`
     )
 
   } catch (error) {
-    console.error('Registration error:', error)
+    console.error('❌ REGISTRATION FAILED:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error: error
+    })
+    
     await sendTextMessage(from,
       `❌ Registration failed. Please try again later or contact support.`)
   }
