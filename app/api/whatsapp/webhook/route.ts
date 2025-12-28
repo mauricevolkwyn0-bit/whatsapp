@@ -349,8 +349,13 @@ async function handleClientRegEmail(from: string, email: string, stateData: any)
   const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
 
   try {
+    console.log('🔄 Attempting to send verification email to:', emailLower)
+    console.log('📧 Verification code:', verificationCode)
+    
     // Send verification email via Mailgun
-    await sendVerificationEmail(emailLower, verificationCode, stateData.first_name)
+    const emailResult = await sendVerificationEmail(emailLower, verificationCode, stateData.first_name)
+    
+    console.log('✅ Email sent successfully:', emailResult)
 
     await updateConversationState(from, 'CLIENT_REG_VERIFICATION', {
       ...stateData,
@@ -365,7 +370,14 @@ async function handleClientRegEmail(from: string, email: string, stateData: any)
 Enter the 6-digit code (valid for 10 minutes):`
     )
   } catch (error) {
-    console.error('Error sending verification email:', error)
+    // Enhanced error logging
+    console.error('❌ FULL EMAIL ERROR:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error: error
+    })
+    
     await sendTextMessage(from,
       `❌ Failed to send email. Please check your email address and try again.`)
   }
