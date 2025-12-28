@@ -14,6 +14,7 @@ export type ConversationState =
   | 'CLIENT_REG_SURNAME'
   | 'CLIENT_REG_EMAIL'
   | 'CLIENT_REG_VERIFICATION'
+  | 'SELECTING_JOB_CATEGORY'
   
   // Provider Registration
   | 'PROVIDER_REG_NAME'
