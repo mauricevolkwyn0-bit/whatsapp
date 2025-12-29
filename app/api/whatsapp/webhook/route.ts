@@ -1487,10 +1487,11 @@ async function handleLocationMessage(
     currentState: ConversationState,
     stateData: any
 ) {
-    if (currentState === 'POSTING_JOB_LOCATION') {
-        const latitude = message.location.latitude
-        const longitude = message.location.longitude
+    const latitude = message.location.latitude
+    const longitude = message.location.longitude
 
+    // Handle job posting location
+    if (currentState === 'POSTING_JOB_LOCATION') {
         await updateConversationState(from, 'POSTING_JOB_IMAGES', {
             ...stateData,
             latitude,
@@ -1502,8 +1503,41 @@ async function handleLocationMessage(
 
 📸 Any photos to help providers?
 
-Send images or type 'skip'`
-        )
+Send images or type 'skip'`)
+        return
+    }
+
+    // Handle provider registration location
+    if (currentState === 'PROVIDER_REG_ADDRESS') {
+        // Generate verification code
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+
+        try {
+            // Send verification email
+            await sendVerificationEmail(stateData.email, verificationCode, stateData.first_name)
+
+            await updateConversationState(from, 'PROVIDER_REG_VERIFICATION', {
+                ...stateData,
+                latitude,
+                longitude,
+                address: `Location: ${latitude}, ${longitude}`,
+                verification_code: verificationCode,
+                verification_expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+            })
+
+            await sendTextMessage(from,
+                `Perfect! Location saved.
+
+📧 Verification code sent to ${stateData.email}
+
+Enter the 6-digit code (valid for 10 minutes):`)
+
+        } catch (error) {
+            console.error('❌ Email error:', error)
+            await sendTextMessage(from,
+                `❌ Failed to send verification email. Please try again later.`)
+        }
+        return
     }
 }
 
