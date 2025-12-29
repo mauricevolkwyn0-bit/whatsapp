@@ -539,15 +539,82 @@ async function handleClientRegVerification(from: string, code: string, stateData
             console.log('✅ Auth user created:', userId)
         }
 
-        // Check if client profile exists
-        const { data: existingProfile } = await supabase
+        // ═══════════════════════════════════════════════════════════
+        // CREATE BASE PROFILE (CRITICAL - Required for foreign keys)
+        // ═══════════════════════════════════════════════════════════
+        const { data: existingBaseProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single()
+
+        if (!existingBaseProfile) {
+            console.log('📝 Creating base profile...')
+            const { error: baseProfileError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: userId,
+                    email: stateData.email,
+                    phone: from,
+                    first_name: stateData.first_name,
+                    last_name: stateData.surname,  // ← Note: your table uses last_name, not surname
+                    is_client: true,
+                    is_provider: false,
+                    active_role: 'client',
+                    email_verified: true,
+                    is_verified: false,  // Can be updated later after full verification
+                    is_active: true,
+                    is_suspended: false,
+                    is_admin: false,
+                    client_onboarding_completed: false,
+                    provider_onboarding_completed: false,
+                    preferred_contact_method: 'whatsapp',
+                    country: 'ZA',  // South Africa
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    last_login_at: new Date().toISOString()
+                })
+
+            if (baseProfileError) {
+                console.error('❌ Base profile error:', {
+                    message: baseProfileError.message,
+                    code: baseProfileError.code,
+                    details: baseProfileError.details,
+                    hint: baseProfileError.hint,
+                    error: baseProfileError
+                })
+                throw baseProfileError
+            }
+
+            console.log('✅ Base profile created')
+        } else {
+            console.log('✅ Base profile already exists')
+            
+            // Update existing profile to ensure client role is set
+            const { error: updateProfileError } = await supabase
+                .from('profiles')
+                .update({
+                    is_client: true,
+                    active_role: 'client',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', userId)
+
+            if (updateProfileError) {
+                console.error('⚠️ Could not update profile:', updateProfileError)
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CREATE CLIENT PROFILE (extends base profile)
+        // ═══════════════════════════════════════════════════════════
+        const { data: existingClientProfile } = await supabase
             .from('client_profiles')
             .select('*')
             .eq('user_id', userId)
             .single()
 
-        if (!existingProfile) {
-            // Create client profile
+        if (!existingClientProfile) {
             console.log('📝 Creating client profile...')
             const { data: profileData, error: profileError } = await supabase
                 .from('client_profiles')
@@ -560,7 +627,7 @@ async function handleClientRegVerification(from: string, code: string, stateData
                 .select()
 
             if (profileError) {
-                console.error('❌ Profile error:', {
+                console.error('❌ Client profile error:', {
                     message: profileError.message,
                     code: profileError.code,
                     details: profileError.details,
