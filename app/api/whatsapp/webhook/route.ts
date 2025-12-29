@@ -807,52 +807,52 @@ async function handleJobImages(from: string, text: string, stateData: any) {
 // Create the actual job post in database
 // ═══════════════════════════════════════════════════════════════
 async function createJobPost(from: string, stateData: any) {
-  try {
-    const supabase = getSupabaseServer()
+    try {
+        const supabase = getSupabaseServer()
 
-    console.log('📝 Creating job post:', stateData)
+        console.log('📝 Creating job post:', stateData)
 
-    // Insert job into database
-    const { data: job, error } = await supabase
-      .from('jobs')
-      .insert({
-        client_id: stateData.userId,
-        category_id: stateData.category_id,
-        title: stateData.title,
-        description: stateData.description,
-        budget_min: stateData.budget_min,
-        budget_max: stateData.budget_max,
-        address: stateData.location_text,  // ← Changed from location_text to address
-        latitude: stateData.latitude,
-        longitude: stateData.longitude,
-        status: 'open',
-        application_count: 0,
-        views_count: 0,
-        is_urgent: false,
-        is_featured: false,
-        posted_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single()
+        // Insert job into database
+        const { data: job, error } = await supabase
+            .from('jobs')
+            .insert({
+                client_id: stateData.userId,
+                category_id: stateData.category_id,
+                title: stateData.title,
+                description: stateData.description,
+                budget_min: stateData.budget_min,
+                budget_max: stateData.budget_max,
+                address: stateData.location_text,
+                latitude: stateData.latitude,
+                longitude: stateData.longitude,
+                status: 'active', // ← Changed from 'open' to 'active'
+                application_count: 0,
+                views_count: 0,
+                is_urgent: false,
+                is_featured: false,
+                posted_at: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .select()
+            .single()
 
-    if (error) {
-      console.error('❌ Job creation error:', error)
-      throw error
-    }
+        if (error) {
+            console.error('❌ Job creation error:', error)
+            throw error
+        }
 
-    console.log('✅ Job created:', job.id)
+        console.log('✅ Job created:', job.id)
 
-    // Reset to IDLE state
-    await updateConversationState(from, 'IDLE', {
-      userId: stateData.userId,
-      userType: 'client'
-    })
+        // Reset to IDLE state
+        await updateConversationState(from, 'IDLE', {
+            userId: stateData.userId,
+            userType: 'client'
+        })
 
-    // Send success message
-    await sendTextMessage(from,
-      `✅ *Job posted successfully!*
+        // Send success message
+        await sendTextMessage(from,
+            `✅ *Job posted successfully!*
 
 📋 *${stateData.title}*
 💰 Budget: R${stateData.budget_min}${stateData.budget_max > stateData.budget_min ? `-R${stateData.budget_max}` : ''}
@@ -860,23 +860,23 @@ async function createJobPost(from: string, stateData: any) {
 
 Service providers in your area will see your job and send quotes. You'll be notified when quotes come in!`)
 
-    // Wait a moment, then show menu
-    await new Promise(resolve => setTimeout(resolve, 2000))
+        // Wait a moment, then show menu
+        await new Promise(resolve => setTimeout(resolve, 2000))
 
-    await sendInteractiveButtons(from,
-      `What would you like to do next?`,
-      [
-        { id: 'post_job', title: '📝 Post Another Job' },
-        { id: 'my_jobs', title: '📋 My Jobs' },
-        { id: 'history', title: '📊 History' }
-      ]
-    )
+        await sendInteractiveButtons(from,
+            `What would you like to do next?`,
+            [
+                { id: 'post_job', title: '📝 Post Another Job' },
+                { id: 'my_jobs', title: '📋 My Jobs' },
+                { id: 'history', title: '📊 History' }
+            ]
+        )
 
-  } catch (error) {
-    console.error('❌ Failed to create job:', error)
-    await sendTextMessage(from,
-      `❌ Sorry, something went wrong. Please try again or type 'MENU'.`)
-  }
+    } catch (error) {
+        console.error('❌ Failed to create job:', error)
+        await sendTextMessage(from,
+            `❌ Sorry, something went wrong. Please try again or type 'MENU'.`)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -972,19 +972,19 @@ async function getUserByWhatsApp(phone: string) {
 }
 
 async function logMessage(from: string, text: string, type: string) {
-  try {
-    const supabase = getSupabaseServer()
-    await supabase.from('whatsapp_messages').insert({
-      whatsapp_number: from,
-      message_text: text,
-      message_type: type,
-      direction: 'incoming',
-      created_at: new Date().toISOString()
-    })
-  } catch (error) {
-    // Don't fail the whole flow if logging fails
-    console.error('⚠️ Failed to log message:', error)
-  }
+    try {
+        const supabase = getSupabaseServer()
+        await supabase.from('whatsapp_messages').insert({
+            whatsapp_number: from,
+            message_text: text,
+            message_type: type,
+            direction: 'incoming',
+            created_at: new Date().toISOString()
+        })
+    } catch (error) {
+        // Don't fail the whole flow if logging fails
+        console.error('⚠️ Failed to log message:', error)
+    }
 }
 
 async function handleHelp(from: string) {
