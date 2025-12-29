@@ -984,229 +984,229 @@ Enter the 6-digit code (valid for 10 minutes):`)
 }
 
 async function handleProviderRegVerification(from: string, code: string, stateData: any) {
-  const codeClean = code.trim()
+    const codeClean = code.trim()
 
-  if (codeClean !== stateData.verification_code) {
-    await sendTextMessage(from,
-      `❌ Invalid code. Please try again or type 'MENU' to start over.`)
-    return
-  }
+    if (codeClean !== stateData.verification_code) {
+        await sendTextMessage(from,
+            `❌ Invalid code. Please try again or type 'MENU' to start over.`)
+        return
+    }
 
-  try {
-    const supabase = getSupabaseServer()
+    try {
+        const supabase = getSupabaseServer()
 
-    console.log('👤 Creating provider:', {
-      email: stateData.email,
-      phone: from,
-      category: stateData.category_name
-    })
+        console.log('👤 Creating provider:', {
+            email: stateData.email,
+            phone: from,
+            category: stateData.category_name
+        })
 
-    // Check if user exists
-    const { data: existingUsers } = await supabase.auth.admin.listUsers()
-    const existingUser = existingUsers?.users.find(
-      u => u.email === stateData.email || u.phone === from
-    )
+        // Check if user exists
+        const { data: existingUsers } = await supabase.auth.admin.listUsers()
+        const existingUser = existingUsers?.users.find(
+            u => u.email === stateData.email || u.phone === from
+        )
 
-    let userId: string
+        let userId: string
 
-    if (existingUser) {
-      console.log('⚠️ User already exists:', existingUser.id)
-      userId = existingUser.id
+        if (existingUser) {
+            console.log('⚠️ User already exists:', existingUser.id)
+            userId = existingUser.id
 
-      // Update metadata
-      await supabase.auth.admin.updateUserById(existingUser.id, {
-        user_metadata: {
-          user_type: 'provider',
-          first_name: stateData.first_name,
-          surname: stateData.surname,
-          full_name: `${stateData.first_name} ${stateData.surname}`,
-          whatsapp_number: from,
-          registered_via: 'whatsapp',
-          registered_at: existingUser.created_at
+            // Update metadata
+            await supabase.auth.admin.updateUserById(existingUser.id, {
+                user_metadata: {
+                    user_type: 'provider',
+                    first_name: stateData.first_name,
+                    surname: stateData.surname,
+                    full_name: `${stateData.first_name} ${stateData.surname}`,
+                    whatsapp_number: from,
+                    registered_via: 'whatsapp',
+                    registered_at: existingUser.created_at
+                }
+            })
+        } else {
+            // Create new user
+            console.log('📝 Creating new auth user...')
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                email: stateData.email,
+                phone: from,
+                email_confirm: true,
+                phone_confirm: true,
+                user_metadata: {
+                    user_type: 'provider',
+                    first_name: stateData.first_name,
+                    surname: stateData.surname,
+                    full_name: `${stateData.first_name} ${stateData.surname}`,
+                    whatsapp_number: from,
+                    registered_via: 'whatsapp',
+                    registered_at: new Date().toISOString()
+                }
+            })
+
+            if (authError) {
+                console.error('❌ Auth error:', authError)
+                throw authError
+            }
+
+            userId = authData.user.id
+            console.log('✅ Auth user created:', userId)
         }
-      })
-    } else {
-      // Create new user
-      console.log('📝 Creating new auth user...')
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: stateData.email,
-        phone: from,
-        email_confirm: true,
-        phone_confirm: true,
-        user_metadata: {
-          user_type: 'provider',
-          first_name: stateData.first_name,
-          surname: stateData.surname,
-          full_name: `${stateData.first_name} ${stateData.surname}`,
-          whatsapp_number: from,
-          registered_via: 'whatsapp',
-          registered_at: new Date().toISOString()
+
+        // ═══════════════════════════════════════════════════════════
+        // CREATE BASE PROFILE (CRITICAL - Required for foreign keys)
+        // ═══════════════════════════════════════════════════════════
+        const { data: existingBaseProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single()
+
+        if (!existingBaseProfile) {
+            console.log('📝 Creating base profile...')
+            const { error: baseProfileError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: userId,
+                    email: stateData.email,
+                    phone: from,
+                    first_name: stateData.first_name,
+                    last_name: stateData.surname,
+                    is_client: false,
+                    is_provider: true,
+                    active_role: 'provider',
+                    email_verified: true,
+                    is_verified: false,
+                    is_active: true,
+                    is_suspended: false,
+                    is_admin: false,
+                    client_onboarding_completed: false,
+                    provider_onboarding_completed: false,
+                    preferred_contact_method: 'whatsapp',
+                    country: 'ZA',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    last_login_at: new Date().toISOString()
+                })
+
+            if (baseProfileError) {
+                console.error('❌ Base profile error:', {
+                    message: baseProfileError.message,
+                    code: baseProfileError.code,
+                    details: baseProfileError.details,
+                    hint: baseProfileError.hint,
+                    error: baseProfileError
+                })
+                throw baseProfileError
+            }
+
+            console.log('✅ Base profile created')
+        } else {
+            console.log('✅ Base profile already exists')
+
+            // Update existing profile to ensure provider role is set
+            const { error: updateProfileError } = await supabase
+                .from('profiles')
+                .update({
+                    is_provider: true,
+                    active_role: 'provider',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', userId)
+
+            if (updateProfileError) {
+                console.error('⚠️ Could not update profile:', updateProfileError)
+            }
         }
-      })
 
-      if (authError) {
-        console.error('❌ Auth error:', authError)
-        throw authError
-      }
+        // ═══════════════════════════════════════════════════════════
+        // CREATE PROVIDER PROFILE (extends base profile)
+        // ═══════════════════════════════════════════════════════════
+        const { data: existingProfile } = await supabase
+            .from('provider_profiles')
+            .select('*')
+            .eq('user_id', userId)
+            .single()
 
-      userId = authData.user.id
-      console.log('✅ Auth user created:', userId)
-    }
+        if (!existingProfile) {
+            // Create provider profile
+            console.log('📝 Creating provider profile...')
+            const { data: profileData, error: profileError } = await supabase
+                .from('provider_profiles')
+                .insert({
+                    user_id: userId,
+                    category: stateData.category_id,
+                    experience_years: stateData.experience_years,
+                    portfolio_images: stateData.portfolio_images || [],
+                    total_jobs: 0,
+                    completed_jobs: 0,
+                    success_rate: 0,
+                    average_rating: 0,
+                    total_reviews: 0,
+                    is_available: true,
+                    is_verified: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .select()
 
-    // ═══════════════════════════════════════════════════════════
-    // CREATE BASE PROFILE (CRITICAL - Required for foreign keys)
-    // ═══════════════════════════════════════════════════════════
-    const { data: existingBaseProfile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+            if (profileError) {
+                console.error('❌ Provider profile error:', {
+                    message: profileError.message,
+                    code: profileError.code,
+                    details: profileError.details,
+                    hint: profileError.hint,
+                    error: profileError
+                })
+                throw profileError
+            }
 
-    if (!existingBaseProfile) {
-      console.log('📝 Creating base profile...')
-      const { error: baseProfileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          email: stateData.email,
-          phone: from,
-          first_name: stateData.first_name,
-          last_name: stateData.surname,
-          is_client: false,
-          is_provider: true,
-          active_role: 'provider',
-          email_verified: true,
-          is_verified: false,
-          is_active: true,
-          is_suspended: false,
-          is_admin: false,
-          client_onboarding_completed: false,
-          provider_onboarding_completed: false,
-          preferred_contact_method: 'whatsapp',
-          country: 'ZA',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          last_login_at: new Date().toISOString()
+            console.log('✅ Provider profile created:', profileData)
+        } else {
+            console.log('✅ Provider profile already exists')
+        }
+
+        // Update state to IDLE
+        await updateConversationState(from, 'IDLE', {
+            userId: userId,
+            userType: 'provider'
         })
 
-      if (baseProfileError) {
-        console.error('❌ Base profile error:', {
-          message: baseProfileError.message,
-          code: baseProfileError.code,
-          details: baseProfileError.details,
-          hint: baseProfileError.hint,
-          error: baseProfileError
-        })
-        throw baseProfileError
-      }
+        console.log('✅ Provider registration completed!')
 
-      console.log('✅ Base profile created')
-    } else {
-      console.log('✅ Base profile already exists')
+        // Send welcome email
+        if (!existingUser) {
+            try {
+                await sendWelcomeEmail(stateData.email, stateData.first_name, 'provider')
+            } catch (emailError) {
+                console.error('⚠️ Welcome email failed:', emailError)
+            }
+        }
 
-      // Update existing profile to ensure provider role is set
-      const { error: updateProfileError } = await supabase
-        .from('profiles')
-        .update({
-          is_provider: true,
-          active_role: 'provider',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId)
-
-      if (updateProfileError) {
-        console.error('⚠️ Could not update profile:', updateProfileError)
-      }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // CREATE PROVIDER PROFILE (extends base profile)
-    // ═══════════════════════════════════════════════════════════
-    const { data: existingProfile } = await supabase
-      .from('provider_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
-
-    if (!existingProfile) {
-      // Create provider profile
-      console.log('📝 Creating provider profile...')
-      const { data: profileData, error: profileError } = await supabase
-        .from('provider_profiles')
-        .insert({
-          user_id: userId,
-          category: stateData.category_id,
-          experience_years: stateData.experience_years,
-          portfolio_images: stateData.portfolio_images || [],
-          total_jobs: 0,
-          completed_jobs: 0,
-          success_rate: 0,
-          average_rating: 0,
-          total_reviews: 0,
-          is_available: true,
-          is_verified: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-
-      if (profileError) {
-        console.error('❌ Provider profile error:', {
-          message: profileError.message,
-          code: profileError.code,
-          details: profileError.details,
-          hint: profileError.hint,
-          error: profileError
-        })
-        throw profileError
-      }
-
-      console.log('✅ Provider profile created:', profileData)
-    } else {
-      console.log('✅ Provider profile already exists')
-    }
-
-    // Update state to IDLE
-    await updateConversationState(from, 'IDLE', {
-      userId: userId,
-      userType: 'provider'
-    })
-
-    console.log('✅ Provider registration completed!')
-
-    // Send welcome email
-    if (!existingUser) {
-      try {
-        await sendWelcomeEmail(stateData.email, stateData.first_name, 'provider')
-      } catch (emailError) {
-        console.error('⚠️ Welcome email failed:', emailError)
-      }
-    }
-
-    // Send success message with menu
-    await sendInteractiveButtons(from,
-      `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
+        // Send success message with menu
+        await sendInteractiveButtons(from,
+            `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
 
 Welcome ${stateData.first_name}! You're now registered as a *${stateData.category_name}* provider.
 
 You can now:`,
-      [
-        { id: 'find_jobs', title: '🔍 Find Jobs' },
-        { id: 'my_jobs', title: '📋 My Jobs' },
-        { id: 'earnings', title: '💰 Earnings' }
-      ]
-    )
+            [
+                { id: 'find_jobs', title: '🔍 Find Jobs' },
+                { id: 'my_jobs', title: '📋 My Jobs' },
+                { id: 'earnings', title: '💰 Earnings' }
+            ]
+        )
 
-  } catch (error) {
-    console.error('❌ Provider registration failed:', error)
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    })
+    } catch (error) {
+        console.error('❌ Provider registration failed:', error)
+        console.error('Error details:', {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+        })
 
-    await sendTextMessage(from,
-      `❌ Registration failed. Please try again later or contact support.`)
-  }
+        await sendTextMessage(from,
+            `❌ Registration failed. Please try again later or contact support.`)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
