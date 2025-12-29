@@ -623,9 +623,7 @@ async function handleClientRegVerification(from: string, code: string, stateData
                     client_onboarding_completed: false,
                     provider_onboarding_completed: false,
                     preferred_contact_method: 'whatsapp',
-                    country: 'ZA',  // South Africa
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
+                    country: 'South Africa',  // South Africa
                     last_login_at: new Date().toISOString()
                 })
 
@@ -1083,9 +1081,7 @@ async function handleProviderRegVerification(from: string, code: string, stateDa
                     client_onboarding_completed: false,
                     provider_onboarding_completed: false,
                     preferred_contact_method: 'whatsapp',
-                    country: 'ZA',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
+                    country: 'South Africa',
                     last_login_at: new Date().toISOString()
                 })
 
