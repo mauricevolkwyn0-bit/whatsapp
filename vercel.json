@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/notifications/send-email",  
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/notifications/send-whatsapp",
       "schedule": "*/1 * * * *"
     }
