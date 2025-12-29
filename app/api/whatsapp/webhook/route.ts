@@ -160,6 +160,14 @@ async function handleTextMessage(
             await handleJobBudget(from, text, stateData)
             break
 
+        case 'POSTING_JOB_LOCATION':
+            await handleJobLocation(from, text, stateData)  // Add this handler
+            break
+
+        case 'POSTING_JOB_IMAGES':
+            await handleJobImages(from, text, stateData)  // Add this handler
+            break
+
         // Add more states as needed...
 
         default:
@@ -244,31 +252,31 @@ What would you like to do?`,
 }
 
 async function handleCategorySelected(from: string, categorySlug: string, stateData: any) {
-  // Fetch category details from database
-  const supabase = getSupabaseServer()
-  const { data: category, error } = await supabase
-    .from('job_categories')
-    .select('*')
-    .eq('slug', categorySlug)
-    .single()
+    // Fetch category details from database
+    const supabase = getSupabaseServer()
+    const { data: category, error } = await supabase
+        .from('job_categories')
+        .select('*')
+        .eq('slug', categorySlug)
+        .single()
 
-  if (error || !category) {
-    console.error('❌ Category fetch error:', error)
-    await sendTextMessage(from, `❌ Category not found. Please try again.`)
-    await startJobPosting(from, stateData)
-    return
-  }
+    if (error || !category) {
+        console.error('❌ Category fetch error:', error)
+        await sendTextMessage(from, `❌ Category not found. Please try again.`)
+        await startJobPosting(from, stateData)
+        return
+    }
 
-  console.log('✅ Category selected:', category.name)
+    console.log('✅ Category selected:', category.name)
 
-  await updateConversationState(from, 'POSTING_JOB_TITLE', {
-    ...stateData,
-    category_id: category.id,
-    category_name: category.name
-  })
+    await updateConversationState(from, 'POSTING_JOB_TITLE', {
+        ...stateData,
+        category_id: category.id,
+        category_name: category.name
+    })
 
-  await sendTextMessage(from,
-    `Great! *${category.name}*
+    await sendTextMessage(from,
+        `Great! *${category.name}*
 
 Now, briefly describe what you need done:
 
@@ -435,183 +443,183 @@ Enter the 6-digit code (valid for 10 minutes):`
 }
 
 async function handleClientRegVerification(from: string, code: string, stateData: any) {
-  const codeClean = code.trim()
+    const codeClean = code.trim()
 
-  console.log('🔐 Verification attempt:', {
-    from,
-    providedCode: codeClean,
-    expectedCode: stateData.verification_code,
-    match: codeClean === stateData.verification_code
-  })
-
-  if (codeClean !== stateData.verification_code) {
-    await sendTextMessage(from,
-      `❌ Invalid code. Please try again or type 'MENU' to start over.`)
-    return
-  }
-
-  // Create user in database
-  try {
-    console.log('👤 Starting user creation:', {
-      email: stateData.email,
-      phone: from,
-      first_name: stateData.first_name,
-      surname: stateData.surname
+    console.log('🔐 Verification attempt:', {
+        from,
+        providedCode: codeClean,
+        expectedCode: stateData.verification_code,
+        match: codeClean === stateData.verification_code
     })
 
-    const supabase = getSupabaseServer()
-    
-    // Check if user already exists
-    const { data: existingUsers } = await supabase.auth.admin.listUsers()
-    const existingUser = existingUsers?.users.find(
-      u => u.email === stateData.email || u.phone === from
-    )
+    if (codeClean !== stateData.verification_code) {
+        await sendTextMessage(from,
+            `❌ Invalid code. Please try again or type 'MENU' to start over.`)
+        return
+    }
 
-    let userId: string
-
-    if (existingUser) {
-      console.log('⚠️ User already exists:', existingUser.id)
-      userId = existingUser.id
-
-      // Update user metadata if needed
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        existingUser.id,
-        {
-          user_metadata: {
-            user_type: 'client',
+    // Create user in database
+    try {
+        console.log('👤 Starting user creation:', {
+            email: stateData.email,
+            phone: from,
             first_name: stateData.first_name,
-            surname: stateData.surname,
-            full_name: `${stateData.first_name} ${stateData.surname}`,
-            whatsapp_number: from,
-            registered_via: 'whatsapp',
-            registered_at: existingUser.created_at
-          }
-        }
-      )
-
-      if (updateError) {
-        console.error('⚠️ Could not update user metadata:', updateError)
-      }
-
-    } else {
-      // Create new auth user
-      console.log('📝 Creating new auth user...')
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: stateData.email,
-        phone: from,
-        email_confirm: true,
-        phone_confirm: true,
-        user_metadata: {
-          user_type: 'client',
-          first_name: stateData.first_name,
-          surname: stateData.surname,
-          full_name: `${stateData.first_name} ${stateData.surname}`,
-          whatsapp_number: from,
-          registered_via: 'whatsapp',
-          registered_at: new Date().toISOString()
-        }
-      })
-
-      if (authError) {
-        console.error('❌ Auth error:', {
-          message: authError.message,
-          status: authError.status,
-          code: authError.code,
-          details: authError
+            surname: stateData.surname
         })
-        throw authError
-      }
 
-      if (!authData || !authData.user) {
-        console.error('❌ No auth data returned')
-        throw new Error('No user data returned from auth')
-      }
+        const supabase = getSupabaseServer()
 
-      userId = authData.user.id
-      console.log('✅ Auth user created:', userId)
-    }
-
-    // Check if client profile exists
-    const { data: existingProfile } = await supabase
-      .from('client_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
-
-    if (!existingProfile) {
-      // Create client profile
-      console.log('📝 Creating client profile...')
-      const { data: profileData, error: profileError } = await supabase
-        .from('client_profiles')
-        .insert({
-          user_id: userId,
-          total_jobs_posted: 0,
-          total_jobs_completed: 0,
-          total_spent: 0
-        })
-        .select()
-
-      if (profileError) {
-        console.error('❌ Profile error:', {
-          message: profileError.message,
-          code: profileError.code,
-          details: profileError.details,
-          hint: profileError.hint,
-          error: profileError
-        })
-        throw profileError
-      }
-
-      console.log('✅ Client profile created:', profileData)
-    } else {
-      console.log('✅ Client profile already exists')
-    }
-
-    // Update conversation state
-    console.log('📝 Updating conversation state...')
-    await updateConversationState(from, 'IDLE', {
-      userId: userId,
-      userType: 'client'
-    })
-
-    console.log('✅ Registration completed successfully!')
-
-    // Send welcome email (only if new user)
-    if (!existingUser) {
-      try {
-        await sendWelcomeEmail(
-          stateData.email,
-          stateData.first_name,
-          'client'
+        // Check if user already exists
+        const { data: existingUsers } = await supabase.auth.admin.listUsers()
+        const existingUser = existingUsers?.users.find(
+            u => u.email === stateData.email || u.phone === from
         )
-      } catch (emailError) {
-        console.error('⚠️ Welcome email failed (non-critical):', emailError)
-      }
-    }
 
-    // Registration complete - SHOW INTERACTIVE BUTTONS
-    await sendInteractiveButtons(from,
-      `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
+        let userId: string
+
+        if (existingUser) {
+            console.log('⚠️ User already exists:', existingUser.id)
+            userId = existingUser.id
+
+            // Update user metadata if needed
+            const { error: updateError } = await supabase.auth.admin.updateUserById(
+                existingUser.id,
+                {
+                    user_metadata: {
+                        user_type: 'client',
+                        first_name: stateData.first_name,
+                        surname: stateData.surname,
+                        full_name: `${stateData.first_name} ${stateData.surname}`,
+                        whatsapp_number: from,
+                        registered_via: 'whatsapp',
+                        registered_at: existingUser.created_at
+                    }
+                }
+            )
+
+            if (updateError) {
+                console.error('⚠️ Could not update user metadata:', updateError)
+            }
+
+        } else {
+            // Create new auth user
+            console.log('📝 Creating new auth user...')
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                email: stateData.email,
+                phone: from,
+                email_confirm: true,
+                phone_confirm: true,
+                user_metadata: {
+                    user_type: 'client',
+                    first_name: stateData.first_name,
+                    surname: stateData.surname,
+                    full_name: `${stateData.first_name} ${stateData.surname}`,
+                    whatsapp_number: from,
+                    registered_via: 'whatsapp',
+                    registered_at: new Date().toISOString()
+                }
+            })
+
+            if (authError) {
+                console.error('❌ Auth error:', {
+                    message: authError.message,
+                    status: authError.status,
+                    code: authError.code,
+                    details: authError
+                })
+                throw authError
+            }
+
+            if (!authData || !authData.user) {
+                console.error('❌ No auth data returned')
+                throw new Error('No user data returned from auth')
+            }
+
+            userId = authData.user.id
+            console.log('✅ Auth user created:', userId)
+        }
+
+        // Check if client profile exists
+        const { data: existingProfile } = await supabase
+            .from('client_profiles')
+            .select('*')
+            .eq('user_id', userId)
+            .single()
+
+        if (!existingProfile) {
+            // Create client profile
+            console.log('📝 Creating client profile...')
+            const { data: profileData, error: profileError } = await supabase
+                .from('client_profiles')
+                .insert({
+                    user_id: userId,
+                    total_jobs_posted: 0,
+                    total_jobs_completed: 0,
+                    total_spent: 0
+                })
+                .select()
+
+            if (profileError) {
+                console.error('❌ Profile error:', {
+                    message: profileError.message,
+                    code: profileError.code,
+                    details: profileError.details,
+                    hint: profileError.hint,
+                    error: profileError
+                })
+                throw profileError
+            }
+
+            console.log('✅ Client profile created:', profileData)
+        } else {
+            console.log('✅ Client profile already exists')
+        }
+
+        // Update conversation state
+        console.log('📝 Updating conversation state...')
+        await updateConversationState(from, 'IDLE', {
+            userId: userId,
+            userType: 'client'
+        })
+
+        console.log('✅ Registration completed successfully!')
+
+        // Send welcome email (only if new user)
+        if (!existingUser) {
+            try {
+                await sendWelcomeEmail(
+                    stateData.email,
+                    stateData.first_name,
+                    'client'
+                )
+            } catch (emailError) {
+                console.error('⚠️ Welcome email failed (non-critical):', emailError)
+            }
+        }
+
+        // Registration complete - SHOW INTERACTIVE BUTTONS
+        await sendInteractiveButtons(from,
+            `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
 
 Welcome ${stateData.first_name}! You can now:`,
-      [
-        { id: 'post_job', title: '📝 Post a Job' },
-        { id: 'my_jobs', title: '📋 My Jobs' },
-        { id: 'history', title: '📊 History' }
-      ]
-    )
+            [
+                { id: 'post_job', title: '📝 Post a Job' },
+                { id: 'my_jobs', title: '📋 My Jobs' },
+                { id: 'history', title: '📊 History' }
+            ]
+        )
 
-  } catch (error) {
-    console.error('❌ REGISTRATION FAILED:', error)
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      error: error
-    })
-    
-    await sendTextMessage(from,
-      `❌ Registration failed. Please try again later or contact support.`)
-  }
+    } catch (error) {
+        console.error('❌ REGISTRATION FAILED:', error)
+        console.error('Error details:', {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            error: error
+        })
+
+        await sendTextMessage(from,
+            `❌ Registration failed. Please try again later or contact support.`)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -633,95 +641,95 @@ What's your first name?`
 // JOB POSTING FLOW
 // ═══════════════════════════════════════════════════════════════
 async function startJobPosting(from: string, stateData: any) {
-  // Check if user is registered
-  const user = await getUserByWhatsApp(from)
+    // Check if user is registered
+    const user = await getUserByWhatsApp(from)
 
-  console.log('🔍 startJobPosting - user check:', {
-    from,
-    userFound: !!user,
-    userId: user?.id,
-    userType: user?.user_metadata?.user_type
-  })
+    console.log('🔍 startJobPosting - user check:', {
+        from,
+        userFound: !!user,
+        userId: user?.id,
+        userType: user?.user_metadata?.user_type
+    })
 
-  if (!user) {
-    await sendTextMessage(from, `Please register first! Type 'MENU' to get started.`)
-    return
-  }
+    if (!user) {
+        await sendTextMessage(from, `Please register first! Type 'MENU' to get started.`)
+        return
+    }
 
-  if (user.user_metadata?.user_type !== 'client') {
-    await sendTextMessage(from,
-      `Only clients can post jobs. Type 'MENU' to see your options.`)
-    return
-  }
+    if (user.user_metadata?.user_type !== 'client') {
+        await sendTextMessage(from,
+            `Only clients can post jobs. Type 'MENU' to see your options.`)
+        return
+    }
 
-  await updateConversationState(from, 'SELECTING_JOB_CATEGORY', {
-    userId: user.id,
-    userType: 'client'
-  })
+    await updateConversationState(from, 'SELECTING_JOB_CATEGORY', {
+        userId: user.id,
+        userType: 'client'
+    })
 
-  // Show TOP 9 categories + "More categories" option
-  await sendInteractiveList(from,
-    `📝 *Let's post your job!*
+    // Show TOP 9 categories + "More categories" option
+    await sendInteractiveList(from,
+        `📝 *Let's post your job!*
 
 What type of service do you need?`,
-    'Choose Category',
-    [
-      {
-        title: '🏠 Popular Services',
-        rows: [
-          { id: 'general-handyman', title: 'General Handyman', description: 'Small repairs & fixes' },
-          { id: 'plumbing', title: 'Plumbing', description: 'Taps, pipes, geysers' },
-          { id: 'electrical-power', title: 'Electrical', description: 'Wiring, lighting' },
-          { id: 'painting-decorating', title: 'Painting', description: 'Interior & exterior' },
-          { id: 'cleaning-services', title: 'Cleaning', description: 'Home & office' },
-          { id: 'home-improvements-renovations', title: 'Renovations', description: 'Building work' }
+        'Choose Category',
+        [
+            {
+                title: '🏠 Popular Services',
+                rows: [
+                    { id: 'general-handyman', title: 'General Handyman', description: 'Small repairs & fixes' },
+                    { id: 'plumbing', title: 'Plumbing', description: 'Taps, pipes, geysers' },
+                    { id: 'electrical-power', title: 'Electrical', description: 'Wiring, lighting' },
+                    { id: 'painting-decorating', title: 'Painting', description: 'Interior & exterior' },
+                    { id: 'cleaning-services', title: 'Cleaning', description: 'Home & office' },
+                    { id: 'home-improvements-renovations', title: 'Renovations', description: 'Building work' }
+                ]
+            },
+            {
+                title: '🔧 Other Services',
+                rows: [
+                    { id: 'car-mechanic', title: 'Car Mechanic', description: 'Services & repairs' },
+                    { id: 'moving-transport', title: 'Moving', description: 'Bakkie & truck hire' },
+                    { id: 'more-categories', title: '➕ More Categories', description: 'See all services' }
+                ]
+            }
         ]
-      },
-      {
-        title: '🔧 Other Services',
-        rows: [
-          { id: 'car-mechanic', title: 'Car Mechanic', description: 'Services & repairs' },
-          { id: 'moving-transport', title: 'Moving', description: 'Bakkie & truck hire' },
-          { id: 'more-categories', title: '➕ More Categories', description: 'See all services' }
-        ]
-      }
-    ]
-  )
+    )
 }
 
 async function showMoreCategories(from: string, stateData: any) {
-  await sendInteractiveList(from,
-    `📋 *More Categories*
+    await sendInteractiveList(from,
+        `📋 *More Categories*
 
 Choose a service category:`,
-    'Choose Category',
-    [
-      {
-        title: '🏠 Home Services',
-        rows: [
-          { id: 'furniture-assembly-repairs', title: 'Furniture Assembly', description: 'Flat-pack & repairs' },
-          { id: 'appliance-installations', title: 'Appliance Install', description: 'Stoves, gates' }
+        'Choose Category',
+        [
+            {
+                title: '🏠 Home Services',
+                rows: [
+                    { id: 'furniture-assembly-repairs', title: 'Furniture Assembly', description: 'Flat-pack & repairs' },
+                    { id: 'appliance-installations', title: 'Appliance Install', description: 'Stoves, gates' }
+                ]
+            },
+            {
+                title: '🚗 Automotive',
+                rows: [
+                    { id: 'panelbeating', title: 'Panelbeating', description: 'Dent repairs' }
+                ]
+            },
+            {
+                title: '👥 Personal Services',
+                rows: [
+                    { id: 'it-tech-support', title: 'IT & Tech', description: 'WiFi, networking' },
+                    { id: 'lessons-tutoring', title: 'Tutoring', description: 'School & skills' },
+                    { id: 'care-wellness', title: 'Care & Wellness', description: 'Babysitting, care' },
+                    { id: 'events-catering', title: 'Events', description: 'Parties & catering' },
+                    { id: 'dog-breeding', title: 'Dog Breeding', description: 'Puppies & studs' },
+                    { id: 'back-to-main', title: '⬅️ Back', description: 'Main categories' }
+                ]
+            }
         ]
-      },
-      {
-        title: '🚗 Automotive',
-        rows: [
-          { id: 'panelbeating', title: 'Panelbeating', description: 'Dent repairs' }
-        ]
-      },
-      {
-        title: '👥 Personal Services',
-        rows: [
-          { id: 'it-tech-support', title: 'IT & Tech', description: 'WiFi, networking' },
-          { id: 'lessons-tutoring', title: 'Tutoring', description: 'School & skills' },
-          { id: 'care-wellness', title: 'Care & Wellness', description: 'Babysitting, care' },
-          { id: 'events-catering', title: 'Events', description: 'Parties & catering' },
-          { id: 'dog-breeding', title: 'Dog Breeding', description: 'Puppies & studs' },
-          { id: 'back-to-main', title: '⬅️ Back', description: 'Main categories' }
-        ]
-      }
-    ]
-  )
+    )
 }
 
 async function handleJobTitle(from: string, title: string, stateData: any) {
@@ -780,6 +788,98 @@ You can:
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Handle "done" or "skip" for images
+// ═══════════════════════════════════════════════════════════════
+async function handleJobImages(from: string, text: string, stateData: any) {
+    const textLower = text.toLowerCase().trim()
+
+    if (textLower === 'done' || textLower === 'skip') {
+        // Finalize and create the job
+        await createJobPost(from, stateData)
+        return
+    }
+
+    await sendTextMessage(from,
+        `Type 'done' when finished or 'skip' if you don't want to add photos.`)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Create the actual job post in database
+// ═══════════════════════════════════════════════════════════════
+async function createJobPost(from: string, stateData: any) {
+  try {
+    const supabase = getSupabaseServer()
+
+    console.log('📝 Creating job post:', stateData)
+
+    // Insert job into database
+    const { data: job, error } = await supabase
+      .from('jobs')
+      .insert({
+        client_id: stateData.userId,
+        category_id: stateData.category_id,
+        title: stateData.title,
+        description: stateData.description,
+        budget_min: stateData.budget_min,
+        budget_max: stateData.budget_max,
+        address: stateData.location_text,  // ← Changed from location_text to address
+        latitude: stateData.latitude,
+        longitude: stateData.longitude,
+        status: 'open',
+        application_count: 0,
+        views_count: 0,
+        is_urgent: false,
+        is_featured: false,
+        posted_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('❌ Job creation error:', error)
+      throw error
+    }
+
+    console.log('✅ Job created:', job.id)
+
+    // Reset to IDLE state
+    await updateConversationState(from, 'IDLE', {
+      userId: stateData.userId,
+      userType: 'client'
+    })
+
+    // Send success message
+    await sendTextMessage(from,
+      `✅ *Job posted successfully!*
+
+📋 *${stateData.title}*
+💰 Budget: R${stateData.budget_min}${stateData.budget_max > stateData.budget_min ? `-R${stateData.budget_max}` : ''}
+📍 ${stateData.location_text || 'Location provided'}
+
+Service providers in your area will see your job and send quotes. You'll be notified when quotes come in!`)
+
+    // Wait a moment, then show menu
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    await sendInteractiveButtons(from,
+      `What would you like to do next?`,
+      [
+        { id: 'post_job', title: '📝 Post Another Job' },
+        { id: 'my_jobs', title: '📋 My Jobs' },
+        { id: 'history', title: '📊 History' }
+      ]
+    )
+
+  } catch (error) {
+    console.error('❌ Failed to create job:', error)
+    await sendTextMessage(from,
+      `❌ Sorry, something went wrong. Please try again or type 'MENU'.`)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // HANDLE IMAGE MESSAGES
 // ═══════════════════════════════════════════════════════════════
 async function handleImageMessage(
@@ -794,6 +894,25 @@ async function handleImageMessage(
         await sendTextMessage(from,
             `✅ Photo added! Send another or type 'done'`)
     }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Handle text location input (when user types address instead of sending GPS)
+// ═══════════════════════════════════════════════════════════════
+async function handleJobLocation(from: string, location: string, stateData: any) {
+    const locationText = sanitizeInput(location)
+
+    await updateConversationState(from, 'POSTING_JOB_IMAGES', {
+        ...stateData,
+        location_text: locationText
+    })
+
+    await sendTextMessage(from,
+        `Great! Location saved: ${locationText}
+
+📸 Any photos to help providers understand the job better?
+
+Send images or type 'skip' to continue`)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -829,38 +948,43 @@ Send images or type 'skip'`
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
 async function getUserByWhatsApp(phone: string) {
-  const supabase = getSupabaseServer()
-  
-  // Get user from Supabase Auth
-  const { data: { users }, error } = await supabase.auth.admin.listUsers()
-  
-  if (error) {
-    console.error('Error fetching users:', error)
-    return null
-  }
-  
-  // Find user by phone number
-  const user = users?.find(u => u.phone === phone)
-  
-  console.log('👤 getUserByWhatsApp result:', {
-    phone,
-    found: !!user,
-    userId: user?.id,
-    userType: user?.user_metadata?.user_type
-  })
-  
-  return user || null
+    const supabase = getSupabaseServer()
+
+    // Get user from Supabase Auth
+    const { data: { users }, error } = await supabase.auth.admin.listUsers()
+
+    if (error) {
+        console.error('Error fetching users:', error)
+        return null
+    }
+
+    // Find user by phone number
+    const user = users?.find(u => u.phone === phone)
+
+    console.log('👤 getUserByWhatsApp result:', {
+        phone,
+        found: !!user,
+        userId: user?.id,
+        userType: user?.user_metadata?.user_type
+    })
+
+    return user || null
 }
 
 async function logMessage(from: string, text: string, type: string) {
+  try {
     const supabase = getSupabaseServer()
     await supabase.from('whatsapp_messages').insert({
-        whatsapp_number: from,
-        message_text: text,
-        message_type: type,
-        direction: 'incoming',
-        created_at: new Date().toISOString()
+      whatsapp_number: from,
+      message_text: text,
+      message_type: type,
+      direction: 'incoming',
+      created_at: new Date().toISOString()
     })
+  } catch (error) {
+    // Don't fail the whole flow if logging fails
+    console.error('⚠️ Failed to log message:', error)
+  }
 }
 
 async function handleHelp(from: string) {
