@@ -77,6 +77,8 @@ export async function POST(request: NextRequest) {
             await handleInteractiveMessage(from, message, currentState, stateData)
         } else if (messageType === 'image') {
             await handleImageMessage(from, message, currentState, stateData)
+        } else if (messageType === 'document') {
+            await handleDocumentMessage(from, message, currentState, stateData)  // ← Add this
         } else if (messageType === 'location') {
             await handleLocationMessage(from, message, currentState, stateData)
         }
@@ -144,6 +146,42 @@ async function handleTextMessage(
         case 'CLIENT_REG_VERIFICATION':
             await handleClientRegVerification(from, text, stateData)
             break
+
+        // ─────────────────────────────────────────────────────────
+        // PROVIDER REGISTRATION STATES
+        // ─────────────────────────────────────────────────────────
+        case 'PROVIDER_REG_NAME':
+            await handleProviderRegName(from, text, stateData)
+            break
+
+        case 'PROVIDER_REG_SURNAME':
+            await handleProviderRegSurname(from, text, stateData)
+            break
+
+        case 'PROVIDER_REG_EMAIL':
+            await handleProviderRegEmail(from, text, stateData)
+            break
+
+        case 'PROVIDER_REG_EXPERIENCE':
+            await handleProviderExperience(from, text, stateData)
+            break
+
+        case 'PROVIDER_REG_CV':
+            await handleProviderCV(from, text, stateData)
+            break
+
+        case 'PROVIDER_REG_PORTFOLIO':
+            await handleProviderPortfolio(from, text, stateData)
+            break
+
+        case 'PROVIDER_REG_ADDRESS':
+            await handleProviderAddress(from, text, stateData)
+            break
+
+        case 'PROVIDER_REG_VERIFICATION':
+            await handleProviderRegVerification(from, text, stateData)
+            break
+
 
         // ─────────────────────────────────────────────────────────
         // JOB POSTING STATES
@@ -298,7 +336,7 @@ async function handleInteractiveMessage(
     console.log(`Button/List clicked: ${buttonId} (state: ${currentState})`)
 
     // ─────────────────────────────────────────────────────────
-    // HANDLE CATEGORY SELECTION (must come BEFORE switch)
+    // HANDLE JOB CATEGORY SELECTION (must come BEFORE switch)
     // ─────────────────────────────────────────────────────────
     if (currentState === 'SELECTING_JOB_CATEGORY') {
         if (buttonId === 'more-categories') {
@@ -310,6 +348,22 @@ async function handleInteractiveMessage(
             return
         }
         await handleCategorySelected(from, buttonId, stateData)
+        return
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // HANDLE PROVIDER CATEGORY SELECTION (must come BEFORE switch)
+    // ─────────────────────────────────────────────────────────
+    if (currentState === 'PROVIDER_REG_CATEGORY') {
+        if (buttonId === 'provider-more-categories') {
+            await showProviderMoreCategories(from, stateData)
+            return
+        }
+        if (buttonId === 'provider-back-to-main') {
+            await handleProviderRegEmail(from, stateData.email, stateData)
+            return
+        }
+        await handleProviderCategorySelected(from, buttonId, stateData)
         return
     }
 
@@ -693,15 +747,438 @@ Welcome ${stateData.first_name}! You can now:`,
 // PROVIDER REGISTRATION FLOW
 // ═══════════════════════════════════════════════════════════════
 async function startProviderRegistration(from: string) {
-    await updateConversationState(from, 'PROVIDER_REG_NAME', {
-        user_type: 'provider'
+  await updateConversationState(from, 'PROVIDER_REG_NAME', {
+    user_type: 'provider'
+  })
+
+  await sendTextMessage(from,
+    `Excellent! Let's get you registered as a service provider.
+
+What's your first name?`)
+}
+
+async function handleProviderRegName(from: string, name: string, stateData: any) {
+  const firstName = sanitizeInput(name)
+
+  await updateConversationState(from, 'PROVIDER_REG_SURNAME', {
+    ...stateData,
+    first_name: firstName
+  })
+
+  await sendTextMessage(from, `What's your surname?`)
+}
+
+async function handleProviderRegSurname(from: string, surname: string, stateData: any) {
+  const surnameSanitized = sanitizeInput(surname)
+
+  await updateConversationState(from, 'PROVIDER_REG_EMAIL', {
+    ...stateData,
+    surname: surnameSanitized
+  })
+
+  await sendTextMessage(from, `What's your email address?`)
+}
+
+async function handleProviderRegEmail(from: string, email: string, stateData: any) {
+  const emailLower = email.toLowerCase().trim()
+
+  if (!isValidEmail(emailLower)) {
+    await sendTextMessage(from,
+      `That doesn't look like a valid email address. Please try again:`)
+    return
+  }
+
+  // Move to category selection
+  await updateConversationState(from, 'PROVIDER_REG_CATEGORY', {
+    ...stateData,
+    email: emailLower
+  })
+
+  // Show category selection
+  await sendInteractiveList(from,
+    `📋 What type of services do you offer?
+
+Select your main category:`,
+    'Choose Category',
+    [
+      {
+        title: '🏠 Home Services',
+        rows: [
+          { id: 'general-handyman', title: 'General Handyman', description: 'Repairs & maintenance' },
+          { id: 'plumbing', title: 'Plumbing', description: 'Taps, pipes, geysers' },
+          { id: 'electrical-power', title: 'Electrical', description: 'Wiring & power' },
+          { id: 'painting-decorating', title: 'Painting', description: 'Interior & exterior' },
+          { id: 'cleaning-services', title: 'Cleaning', description: 'Home & office' },
+          { id: 'home-improvements-renovations', title: 'Renovations', description: 'Building work' }
+        ]
+      },
+      {
+        title: '🔧 Other Services',
+        rows: [
+          { id: 'car-mechanic', title: 'Car Mechanic', description: 'Vehicle repairs' },
+          { id: 'moving-transport', title: 'Moving', description: 'Transport services' },
+          { id: 'provider-more-categories', title: '➕ More Categories', description: 'See all services' }
+        ]
+      }
+    ]
+  )
+}
+
+async function showProviderMoreCategories(from: string, stateData: any) {
+  await sendInteractiveList(from,
+    `📋 More Service Categories`,
+    'Choose Category',
+    [
+      {
+        title: '🏠 Home Services',
+        rows: [
+          { id: 'furniture-assembly-repairs', title: 'Furniture Assembly', description: 'Flat-pack & repairs' },
+          { id: 'appliance-installations', title: 'Appliance Install', description: 'Stoves, gates' }
+        ]
+      },
+      {
+        title: '🚗 Automotive',
+        rows: [
+          { id: 'panelbeating', title: 'Panelbeating', description: 'Dent repairs' }
+        ]
+      },
+      {
+        title: '👥 Personal Services',
+        rows: [
+          { id: 'it-tech-support', title: 'IT & Tech', description: 'Tech support' },
+          { id: 'lessons-tutoring', title: 'Tutoring', description: 'Teaching' },
+          { id: 'care-wellness', title: 'Care & Wellness', description: 'Personal care' },
+          { id: 'events-catering', title: 'Events', description: 'Catering' },
+          { id: 'dog-breeding', title: 'Dog Breeding', description: 'Puppies' },
+          { id: 'provider-back-to-main', title: '⬅️ Back', description: 'Main categories' }
+        ]
+      }
+    ]
+  )
+}
+
+async function handleProviderCategorySelected(from: string, categorySlug: string, stateData: any) {
+  const supabase = getSupabaseServer()
+  const { data: category, error } = await supabase
+    .from('job_categories')
+    .select('*')
+    .eq('slug', categorySlug)
+    .single()
+
+  if (error || !category) {
+    console.error('❌ Category fetch error:', error)
+    await sendTextMessage(from, `❌ Category not found. Please try again.`)
+    return
+  }
+
+  await updateConversationState(from, 'PROVIDER_REG_EXPERIENCE', {
+    ...stateData,
+    category_id: category.id,
+    category_name: category.name
+  })
+
+  await sendTextMessage(from,
+    `Great! *${category.name}*
+
+How many years of experience do you have in ${category.name}?
+
+Type a number (e.g., "5" or "0" if just starting)`)
+}
+
+async function handleProviderExperience(from: string, experience: string, stateData: any) {
+  const experienceYears = parseInt(experience.trim())
+
+  if (isNaN(experienceYears) || experienceYears < 0 || experienceYears > 50) {
+    await sendTextMessage(from,
+      `Please enter a valid number of years (0-50):`)
+    return
+  }
+
+  await updateConversationState(from, 'PROVIDER_REG_CV', {
+    ...stateData,
+    experience_years: experienceYears
+  })
+
+  await sendTextMessage(from,
+    `Excellent! ${experienceYears} year${experienceYears !== 1 ? 's' : ''} of experience.
+
+📄 Now, please upload your CV/Resume as a PDF or image.
+
+You can also type 'skip' if you don't have one ready.`)
+}
+
+async function handleProviderCV(from: string, text: string, stateData: any) {
+  const textLower = text.toLowerCase().trim()
+
+  if (textLower === 'skip') {
+    // Skip CV, move to portfolio
+    await updateConversationState(from, 'PROVIDER_REG_PORTFOLIO', {
+      ...stateData,
+      cv_url: null
     })
 
     await sendTextMessage(from,
-        `Excellent! Let's get you registered as a service provider.
+      `No problem! You can add your CV later.
 
-What's your first name?`
+📸 Now, upload photos of your previous work (portfolio).
+
+Send images one by one, or type 'skip' if you don't have any yet.`)
+    return
+  }
+
+  await sendTextMessage(from,
+    `Please upload a document (PDF or image) or type 'skip' to continue.`)
+}
+
+async function handleProviderPortfolio(from: string, text: string, stateData: any) {
+  const textLower = text.toLowerCase().trim()
+
+  if (textLower === 'skip' || textLower === 'done') {
+    // Move to address
+    await updateConversationState(from, 'PROVIDER_REG_ADDRESS', {
+      ...stateData
+    })
+
+    await sendTextMessage(from,
+      `${textLower === 'skip' ? 'No problem! You can add portfolio images later.' : 'Great! Portfolio images saved.'}
+
+📍 What area are you based in?
+
+Example: "Sandton, Johannesburg" or "Cape Town CBD"`)
+    return
+  }
+
+  await sendTextMessage(from,
+    `Send more images or type 'done' when finished.`)
+}
+
+async function handleProviderAddress(from: string, address: string, stateData: any) {
+  const addressClean = sanitizeInput(address)
+
+  // Generate verification code
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+
+  try {
+    // Send verification email
+    await sendVerificationEmail(stateData.email, verificationCode, stateData.first_name)
+
+    await updateConversationState(from, 'PROVIDER_REG_VERIFICATION', {
+      ...stateData,
+      address: addressClean,
+      verification_code: verificationCode,
+      verification_expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    })
+
+    await sendTextMessage(from,
+      `Perfect! Based in ${addressClean}.
+
+📧 Verification code sent to ${stateData.email}
+
+Enter the 6-digit code (valid for 10 minutes):`)
+
+  } catch (error) {
+    console.error('❌ Email error:', error)
+    await sendTextMessage(from,
+      `❌ Failed to send verification email. Please try again later.`)
+  }
+}
+
+async function handleProviderRegVerification(from: string, code: string, stateData: any) {
+  const codeClean = code.trim()
+
+  if (codeClean !== stateData.verification_code) {
+    await sendTextMessage(from,
+      `❌ Invalid code. Please try again or type 'MENU' to start over.`)
+    return
+  }
+
+  try {
+    const supabase = getSupabaseServer()
+
+    console.log('👤 Creating provider:', {
+      email: stateData.email,
+      phone: from,
+      category: stateData.category_name
+    })
+
+    // Check if user exists
+    const { data: existingUsers } = await supabase.auth.admin.listUsers()
+    const existingUser = existingUsers?.users.find(
+      u => u.email === stateData.email || u.phone === from
     )
+
+    let userId: string
+
+    if (existingUser) {
+      console.log('⚠️ User already exists:', existingUser.id)
+      userId = existingUser.id
+      
+      // Update metadata
+      await supabase.auth.admin.updateUserById(existingUser.id, {
+        user_metadata: {
+          user_type: 'provider',
+          first_name: stateData.first_name,
+          surname: stateData.surname,
+          full_name: `${stateData.first_name} ${stateData.surname}`,
+          whatsapp_number: from,
+          registered_via: 'whatsapp',
+          registered_at: existingUser.created_at
+        }
+      })
+    } else {
+      // Create new user
+      console.log('📝 Creating new auth user...')
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: stateData.email,
+        phone: from,
+        email_confirm: true,
+        phone_confirm: true,
+        user_metadata: {
+          user_type: 'provider',
+          first_name: stateData.first_name,
+          surname: stateData.surname,
+          full_name: `${stateData.first_name} ${stateData.surname}`,
+          whatsapp_number: from,
+          registered_via: 'whatsapp',
+          registered_at: new Date().toISOString()
+        }
+      })
+
+      if (authError) {
+        console.error('❌ Auth error:', authError)
+        throw authError
+      }
+      
+      userId = authData.user.id
+      console.log('✅ Auth user created:', userId)
+    }
+
+    // Check if provider profile exists
+    const { data: existingProfile } = await supabase
+      .from('provider_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (!existingProfile) {
+      // Create provider profile
+      console.log('📝 Creating provider profile...')
+      const { data: profileData, error: profileError } = await supabase
+        .from('provider_profiles')
+        .insert({
+          user_id: userId,
+          category: stateData.category_id,
+          experience_years: stateData.experience_years,
+          portfolio_images: stateData.portfolio_images || [],
+          total_jobs: 0,
+          completed_jobs: 0,
+          success_rate: 0,
+          average_rating: 0,
+          total_reviews: 0,
+          is_available: true,
+          is_verified: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+
+      if (profileError) {
+        console.error('❌ Profile error:', profileError)
+        throw profileError
+      }
+
+      console.log('✅ Provider profile created:', profileData)
+    } else {
+      console.log('✅ Provider profile already exists')
+    }
+
+    // Update state to IDLE
+    await updateConversationState(from, 'IDLE', {
+      userId: userId,
+      userType: 'provider'
+    })
+
+    console.log('✅ Provider registration completed!')
+
+    // Send welcome email
+    if (!existingUser) {
+      try {
+        await sendWelcomeEmail(stateData.email, stateData.first_name, 'provider')
+      } catch (emailError) {
+        console.error('⚠️ Welcome email failed:', emailError)
+      }
+    }
+
+    // Send success message with menu
+    await sendInteractiveButtons(from,
+      `🎉 *${existingUser ? 'Welcome back' : 'Registration complete'}!*
+
+Welcome ${stateData.first_name}! You're now registered as a *${stateData.category_name}* provider.
+
+You can now:`,
+      [
+        { id: 'find_jobs', title: '🔍 Find Jobs' },
+        { id: 'my_jobs', title: '📋 My Jobs' },
+        { id: 'earnings', title: '💰 Earnings' }
+      ]
+    )
+
+  } catch (error) {
+    console.error('❌ Provider registration failed:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
+    
+    await sendTextMessage(from,
+      `❌ Registration failed. Please try again later or contact support.`)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Handle CV Document Upload
+// ═══════════════════════════════════════════════════════════════
+async function handleProviderCVDocument(from: string, message: any, stateData: any) {
+  // TODO: Download and store CV document
+  const documentId = message.document?.id || message.image?.id
+  
+  console.log('📄 CV document received:', documentId)
+
+  await updateConversationState(from, 'PROVIDER_REG_PORTFOLIO', {
+    ...stateData,
+    cv_document_id: documentId,
+    cv_url: `whatsapp://document/${documentId}` // Placeholder
+  })
+
+  await sendTextMessage(from,
+    `✅ CV uploaded successfully!
+
+📸 Now, upload photos of your previous work (portfolio).
+
+Send images one by one, or type 'skip' if you don't have any yet.`)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Handle Portfolio Image Upload
+// ═══════════════════════════════════════════════════════════════
+async function handleProviderPortfolioImage(from: string, message: any, stateData: any) {
+  const imageId = message.image?.id
+  
+  console.log('📸 Portfolio image received:', imageId)
+
+  // Add to portfolio images array
+  const portfolioImages = stateData.portfolio_images || []
+  portfolioImages.push(`whatsapp://image/${imageId}`) // Placeholder
+
+  await updateConversationState(from, 'PROVIDER_REG_PORTFOLIO', {
+    ...stateData,
+    portfolio_images: portfolioImages
+  })
+
+  await sendTextMessage(from,
+    `✅ Photo ${portfolioImages.length} added!
+
+Send more images or type 'done' when finished.`)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -950,17 +1427,36 @@ Service providers in your area will see your job and send quotes. You'll be noti
 // HANDLE IMAGE MESSAGES
 // ═══════════════════════════════════════════════════════════════
 async function handleImageMessage(
-    from: string,
-    message: any,
-    currentState: ConversationState,
-    stateData: any
+  from: string,
+  message: any,
+  currentState: ConversationState,
+  stateData: any
 ) {
-    if (currentState === 'POSTING_JOB_IMAGES') {
-        // Handle job photos
-        // TODO: Download and store image
-        await sendTextMessage(from,
-            `✅ Photo added! Send another or type 'done'`)
-    }
+  if (currentState === 'POSTING_JOB_IMAGES') {
+    // Handle job photos
+    await sendTextMessage(from,
+      `✅ Photo added! Send another or type 'done'`)
+  } else if (currentState === 'PROVIDER_REG_PORTFOLIO') {
+    // Handle portfolio images
+    await handleProviderPortfolioImage(from, message, stateData)
+  } else if (currentState === 'PROVIDER_REG_CV') {
+    // Handle CV as image
+    await handleProviderCVDocument(from, message, stateData)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HANDLE DOCUMENT MESSAGES
+// ═══════════════════════════════════════════════════════════════
+async function handleDocumentMessage(
+  from: string,
+  message: any,
+  currentState: ConversationState,
+  stateData: any
+) {
+  if (currentState === 'PROVIDER_REG_CV') {
+    await handleProviderCVDocument(from, message, stateData)
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
