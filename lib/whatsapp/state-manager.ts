@@ -9,14 +9,40 @@ export type ConversationState =
   | 'IDLE'
   | 'CHOOSING_USER_TYPE'
   
-  // Client Registration
+  // Mining Applicant Registration
+  | 'APPLICANT_REG_ID_NUMBER'
+  | 'APPLICANT_REG_ID_UPLOAD'
+  | 'APPLICANT_REG_EMAIL'
+  | 'APPLICANT_REG_ADDRESS'
+  | 'APPLICANT_REG_SELECTING_LEVEL'
+  | 'APPLICANT_REG_UPLOADING_DOCS'
+  | 'APPLICANT_REG_COMPLETE'
+  
+  // Document Uploads by Level
+  | 'UPLOADING_GENERAL_WORKER_DOCS'
+  | 'UPLOADING_SEMI_SKILLED_DOCS'
+  | 'UPLOADING_SKILLED_WORKER_DOCS'
+  | 'UPLOADING_PROFESSIONAL_DOCS'
+  
+  // Profile Management
+  | 'UPDATING_PROFILE'
+  | 'UPDATING_CONTACT'
+  | 'UPDATING_DOCUMENTS'
+  | 'UPDATING_QUALIFICATIONS'
+  
+  // Job Notifications & Actions
+  | 'VIEWING_JOB_DETAILS'
+  | 'VIEWING_INTERVIEW_DETAILS'
+  | 'CONFIRMING_INTERVIEW'
+  | 'VIEWING_JOB_OFFER'
+  | 'ACCEPTING_JOB_OFFER'
+  
+  // Legacy states (keep for backward compatibility)
   | 'CLIENT_REG_NAME'
   | 'CLIENT_REG_SURNAME'
   | 'CLIENT_REG_EMAIL'
   | 'CLIENT_REG_VERIFICATION'
   | 'SELECTING_JOB_CATEGORY'
-  
-  // Provider Registration
   | 'PROVIDER_REG_NAME'
   | 'PROVIDER_REG_SURNAME'
   | 'PROVIDER_REG_EMAIL'
@@ -26,30 +52,21 @@ export type ConversationState =
   | 'PROVIDER_REG_PORTFOLIO'
   | 'PROVIDER_REG_ADDRESS'
   | 'PROVIDER_REG_VERIFICATION'
-  
-  // Job Posting
   | 'POSTING_JOB_TITLE'
   | 'POSTING_JOB_DESCRIPTION'
   | 'POSTING_JOB_BUDGET'
   | 'POSTING_JOB_LOCATION'
   | 'POSTING_JOB_IMAGES'
   | 'CONFIRMING_JOB'
-  
-  // Job Application
   | 'APPLYING_PRICE'
   | 'APPLYING_AVAILABILITY'
   | 'APPLYING_MESSAGE'
-  
-  // Reviews
   | 'REVIEWING_APPLICATIONS'
   | 'RATING_PROVIDER'
   | 'RATING_CLIENT'
   | 'REVIEW_COMMENT'
-  
-  // Other
   | 'PENDING_JOB_POST'
   | 'PENDING_FIND_JOBS'
-  | 'VIEWING_JOB_DETAILS'
   | 'WITHDRAWAL_AMOUNT'
   | 'WITHDRAWAL_BANK_DETAILS'
 
@@ -59,18 +76,44 @@ export type ConversationState =
 export interface StateData {
   // User info
   userId?: string
-  userType?: 'client' | 'provider'
+  userType?: 'client' | 'provider' | 'applicant'
   
-  // Registration
+  // Mining-specific fields
+  id_number?: string
+  id_document_url?: string
+  home_affairs_verified?: boolean
+  physical_address?: string
+  experience_level?: 'general_worker' | 'semi_skilled' | 'skilled_worker' | 'professional'
+  uploaded_documents?: Record<string, string> // document_type -> url
+  pending_documents?: string[] // List of documents still needed
+  applicant_id?: string
+  date_of_birth?: string
+  age?: number
+  gender?: string
+  citizenship?: string
+  last_name?: string
+  
+  // Job notification fields
+  job_posting_id?: string
+  interview_id?: string
+  offer_id?: string
+  
+  // Legacy/Original fields
   user_type?: 'client' | 'provider'
   first_name?: string
   surname?: string
   email?: string
   verification_code?: string
+  verification_expires_at?: string
   category?: string
+  category_id?: string
+  category_name?: string
   experience?: string
+  experience_years?: number
   cv_url?: string
+  cv_document_id?: string
   portfolio_urls?: string[]
+  portfolio_images?: string[]
   address?: string
   
   // Job posting
@@ -80,6 +123,7 @@ export interface StateData {
   budget_max?: number
   latitude?: number
   longitude?: number
+  location_text?: string
   location_address?: string
   images?: string[]
   job_id?: string
@@ -104,7 +148,7 @@ export interface StateData {
 // ═══════════════════════════════════════════════════════════════
 export async function getConversationState(whatsappNumber: string) {
   try {
-    const supabase = getSupabaseServer() // ✅ Create client here
+    const supabase = getSupabaseServer()
     
     const { data, error } = await supabase
       .from('whatsapp_conversation_states')
@@ -133,7 +177,7 @@ export async function updateConversationState(
   data: StateData = {}
 ) {
   try {
-    const supabase = getSupabaseServer() // ✅ Create client here
+    const supabase = getSupabaseServer()
     
     const { error } = await supabase
       .from('whatsapp_conversation_states')
@@ -161,7 +205,6 @@ export async function updateConversationState(
     throw error
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // UPDATE STATE DATA (Keep current state, update data only)
@@ -198,7 +241,7 @@ export async function updateStateData(
 // ═══════════════════════════════════════════════════════════════
 export async function clearConversationState(whatsappNumber: string) {
   try {
-    const supabase = getSupabaseServer() // ✅ Create client here
+    const supabase = getSupabaseServer()
     
     const { error } = await supabase
       .from('whatsapp_conversation_states')
@@ -330,12 +373,24 @@ export function isReviewState(state: ConversationState): boolean {
   return state.includes('RATING_') || state.includes('REVIEW_')
 }
 
+export function isMiningApplicantState(state: ConversationState): boolean {
+  return state.includes('APPLICANT_REG_') || state.includes('UPLOADING_')
+}
+
+export function isProfileUpdateState(state: ConversationState): boolean {
+  return state.includes('UPDATING_')
+}
+
+export function isJobNotificationState(state: ConversationState): boolean {
+  return state.includes('VIEWING_') || state.includes('CONFIRMING_') || state.includes('ACCEPTING_')
+}
+
 // ═══════════════════════════════════════════════════════════════
 // CLEANUP OLD STATES (Run periodically)
 // ═══════════════════════════════════════════════════════════════
 export async function cleanupOldStates(daysOld: number = 7) {
   try {
-    const supabase = getSupabaseServer() // ✅ Create client here
+    const supabase = getSupabaseServer()
     
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - daysOld)

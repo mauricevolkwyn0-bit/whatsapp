@@ -282,6 +282,85 @@ export async function downloadWhatsAppMedia(mediaId: string): Promise<{
 }
 
 // ═══════════════════════════════════════════════════════════════
+// DOWNLOAD AND SAVE MEDIA TO SUPABASE STORAGE (NEW)
+// ═══════════════════════════════════════════════════════════════
+export async function downloadAndStoreDocument(
+  mediaId: string,
+  documentType: string,
+  applicantId?: string
+): Promise<string> {
+  try {
+    // Get media info
+    const mediaInfo = await downloadWhatsAppMedia(mediaId)
+    
+    // Download the actual file
+    const mediaResponse = await fetch(mediaInfo.url, {
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+      },
+    })
+
+    if (!mediaResponse.ok) {
+      throw new Error('Failed to download media file')
+    }
+
+    const fileBuffer = await mediaResponse.arrayBuffer()
+    const fileExtension = getFileExtension(mediaInfo.mimeType)
+    const fileName = `${documentType}_${Date.now()}${fileExtension}`
+    const storagePath = applicantId 
+      ? `applicant-documents/${applicantId}/${fileName}`
+      : `temp-documents/${fileName}`
+
+    // Upload to Supabase Storage
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data, error } = await supabase.storage
+      .from('applicant-documents')
+      .upload(storagePath, fileBuffer, {
+        contentType: mediaInfo.mimeType,
+        upsert: false,
+      })
+
+    if (error) {
+      console.error('Supabase storage error:', error)
+      throw error
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('applicant-documents')
+      .getPublicUrl(storagePath)
+
+    console.log('✅ Document uploaded:', urlData.publicUrl)
+    return urlData.publicUrl
+
+  } catch (error) {
+    console.error('Failed to download and store document:', error)
+    throw error
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GET FILE EXTENSION FROM MIME TYPE (NEW)
+// ═══════════════════════════════════════════════════════════════
+function getFileExtension(mimeType: string): string {
+  const mimeMap: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/heic': '.heic',
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  }
+  return mimeMap[mimeType.toLowerCase()] || '.bin'
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MARK MESSAGE AS READ
 // ═══════════════════════════════════════════════════════════════
 export async function markMessageAsRead(messageId: string) {
@@ -337,4 +416,140 @@ export function isValidWhatsAppNumber(phone: string): boolean {
   const formatted = formatPhoneNumber(phone)
   // South African numbers: 27 + 9 digits
   return /^27\d{9}$/.test(formatted)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MINING-SPECIFIC MESSAGE TEMPLATES (NEW)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Send job notification to applicant
+ */
+export async function sendJobNotification(
+  to: string,
+  jobDetails: {
+    jobTitle: string
+    companyName: string
+    location: string
+    salaryMin: number
+    salaryMax: number
+    jobId: string
+  }
+) {
+  const message = `🔔 *New Job Alert!*
+
+A new position matching your profile is available:
+
+📋 *${jobDetails.jobTitle}*
+⛏️ ${jobDetails.companyName}
+📍 ${jobDetails.location}
+💰 R${jobDetails.salaryMin.toLocaleString()} - R${jobDetails.salaryMax.toLocaleString()}
+
+Reply 'APPLY ${jobDetails.jobId}' to apply now!
+
+Or view full details: https://justwork.co.za/mining/jobs/${jobDetails.jobId}`
+
+  return sendTextMessage(to, message)
+}
+
+/**
+ * Send interview invitation
+ */
+export async function sendInterviewInvitation(
+  to: string,
+  interviewDetails: {
+    jobTitle: string
+    companyName: string
+    date: string
+    time: string
+    location: string
+    contactNumber: string
+    interviewId: string
+  }
+) {
+  const message = `🎯 *Interview Invitation!*
+
+Congratulations! You've been invited for an interview:
+
+📋 Position: *${interviewDetails.jobTitle}*
+⛏️ Company: ${interviewDetails.companyName}
+📅 Date: ${interviewDetails.date}
+🕐 Time: ${interviewDetails.time}
+📍 Location: ${interviewDetails.location}
+
+Reply 'CONFIRM ${interviewDetails.interviewId}' to confirm attendance
+
+Questions? Call: ${interviewDetails.contactNumber}`
+
+  return sendTextMessage(to, message)
+}
+
+/**
+ * Send job offer
+ */
+export async function sendJobOffer(
+  to: string,
+  offerDetails: {
+    jobTitle: string
+    companyName: string
+    salary: number
+    startDate: string
+    hrContact: string
+    offerId: string
+  }
+) {
+  const message = `🎉 *Job Offer!*
+
+Congratulations! You've received a job offer:
+
+📋 Position: *${offerDetails.jobTitle}*
+⛏️ Company: ${offerDetails.companyName}
+💰 Salary: R${offerDetails.salary.toLocaleString()}/month
+📅 Start Date: ${offerDetails.startDate}
+
+Reply 'ACCEPT ${offerDetails.offerId}' to accept this offer
+
+Questions? Call HR: ${offerDetails.hrContact}`
+
+  return sendTextMessage(to, message)
+}
+
+/**
+ * Request document upload
+ */
+export async function requestDocumentUpload(
+  to: string,
+  documentName: string,
+  reason?: string
+) {
+  const message = `📄 *Document Required*
+
+Please upload your *${documentName}*${reason ? `\n\n${reason}` : ''}
+
+Accepted formats: PDF, JPG, PNG
+
+Upload now by sending the document.`
+
+  return sendTextMessage(to, message)
+}
+
+/**
+ * Confirm document received
+ */
+export async function confirmDocumentReceived(
+  to: string,
+  documentName: string,
+  nextDocument?: string
+) {
+  const message = nextDocument
+    ? `✅ *${documentName}* received!
+
+📄 Next document: *${nextDocument}*
+
+Please upload it now.`
+    : `✅ *${documentName}* received!
+
+All documents uploaded successfully! ✅`
+
+  return sendTextMessage(to, message)
 }

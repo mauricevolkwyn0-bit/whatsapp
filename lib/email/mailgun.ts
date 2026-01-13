@@ -10,28 +10,22 @@ const mg = mailgun.client({
   url: 'https://api.mailgun.net' // Use EU endpoint if needed: https://api.eu.mailgun.net
 })
 
-export async function sendVerificationEmail(
+// ═══════════════════════════════════════════════════════════════
+// SEND ID VERIFICATION EMAIL (No code needed for mining)
+// ═══════════════════════════════════════════════════════════════
+export async function sendIDVerificationEmail(
   to: string,
-  code: string,
-  firstName: string
+  firstName: string,
+  lastName: string,
+  idNumber: string
 ) {
   try {
-    // Enhanced logging for debugging
-    console.log('📧 Mailgun Config Check:', {
-      domain: process.env.MAILGUN_DOMAIN,
-      hasApiKey: !!process.env.MAILGUN_API_KEY,
-      apiKeyLength: process.env.MAILGUN_API_KEY?.length,
-      apiKeyPrefix: process.env.MAILGUN_API_KEY?.substring(0, 8),
-      fromEmail: process.env.MAILGUN_FROM_EMAIL,
-      to: to,
-      firstName: firstName,
-      code: code
-    })
+    console.log('📧 Sending ID verification confirmation to:', to)
 
     const messageData = {
-      from: `JUST WORK <${process.env.MAILGUN_FROM_EMAIL || 'noreply@justwork.co.za'}>`,
+      from: `JustWork Mining <${process.env.MAILGUN_FROM_EMAIL || 'noreply@justwork.co.za'}>`,
       to: [to],
-      subject: 'Your JUST WORK Verification Code',
+      subject: 'ID Verification Successful - JustWork Mining',
       html: `
         <!DOCTYPE html>
         <html>
@@ -56,7 +50,7 @@ export async function sendVerificationEmail(
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
               }
               .header {
-                background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+                background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
                 color: white;
                 padding: 30px;
                 text-align: center;
@@ -69,25 +63,11 @@ export async function sendVerificationEmail(
               .content {
                 padding: 40px 30px;
               }
-              .code-container {
+              .info-box {
                 background: #f9f9f9;
-                border: 2px dashed #0066cc;
-                border-radius: 8px;
-                padding: 20px;
-                text-align: center;
-                margin: 30px 0;
-              }
-              .code {
-                font-size: 42px;
-                font-weight: bold;
-                letter-spacing: 10px;
-                color: #0066cc;
-                font-family: 'Courier New', monospace;
-              }
-              .expires {
-                color: #666;
-                font-size: 14px;
-                margin-top: 10px;
+                border-left: 4px solid #d97706;
+                padding: 15px;
+                margin: 20px 0;
               }
               .footer {
                 background: #f9f9f9;
@@ -98,53 +78,48 @@ export async function sendVerificationEmail(
                 border-top: 1px solid #e0e0e0;
               }
               .footer a {
-                color: #0066cc;
+                color: #d97706;
                 text-decoration: none;
-              }
-              .warning {
-                background: #fff3cd;
-                border-left: 4px solid #ffc107;
-                padding: 12px 15px;
-                margin: 20px 0;
-                font-size: 14px;
               }
             </style>
           </head>
           <body>
             <div class="email-container">
               <div class="header">
-                <h1>🔐 Verify Your Email</h1>
+                <h1>✅ ID Verified Successfully</h1>
               </div>
               
               <div class="content">
-                <p style="font-size: 16px; margin-bottom: 10px;">Hi <strong>${firstName}</strong>,</p>
+                <p style="font-size: 16px; margin-bottom: 10px;">Hi <strong>${firstName} ${lastName}</strong>,</p>
                 
-                <p>Welcome to <strong>JUST WORK</strong>! 🇿🇦</p>
+                <p>Welcome to <strong>JustWork Mining</strong>! 🇿🇦⛏️</p>
                 
-                <p>To complete your registration, please use the verification code below:</p>
+                <p>Your South African ID has been successfully verified through Home Affairs.</p>
                 
-                <div class="code-container">
-                  <div class="code">${code}</div>
-                  <div class="expires">⏰ Expires in 10 minutes</div>
+                <div class="info-box">
+                  <strong>Verified Details:</strong><br>
+                  Name: ${firstName} ${lastName}<br>
+                  ID Number: ${idNumber.substring(0, 6)}******
                 </div>
                 
-                <p>Enter this code in WhatsApp to activate your account and start posting jobs or finding work.</p>
+                <p><strong>Next Steps:</strong></p>
+                <ol>
+                  <li>Complete your registration on WhatsApp</li>
+                  <li>Upload required documents</li>
+                  <li>Start receiving job notifications</li>
+                </ol>
                 
-                <div class="warning">
-                  ⚠️ <strong>Didn't request this?</strong><br>
-                  If you didn't sign up for JUST WORK, please ignore this email and the code will expire automatically.
-                </div>
+                <p>Continue your registration on WhatsApp to complete your profile.</p>
               </div>
               
               <div class="footer">
                 <p>
                   <strong>Need help?</strong><br>
                   WhatsApp: <a href="https://wa.me/27730899949">+27 73 089 9949</a><br>
-                  Email: <a href="mailto:support@justwork.co.za">support@justwork.co.za</a><br>
-                  Web: <a href="https://justwork.co.za">justwork.co.za</a>
+                  Email: <a href="mailto:support@justwork.co.za">support@justwork.co.za</a>
                 </p>
                 <p style="margin-top: 15px; color: #999;">
-                  © ${new Date().getFullYear()} JUST WORK. All rights reserved.
+                  © ${new Date().getFullYear()} JustWork Mining. All rights reserved.
                 </p>
               </div>
             </div>
@@ -152,74 +127,68 @@ export async function sendVerificationEmail(
         </html>
       `,
       text: `
-Hi ${firstName},
+Hi ${firstName} ${lastName},
 
-Welcome to JUST WORK!
+Welcome to JustWork Mining!
 
-Your verification code is: ${code}
+Your South African ID has been successfully verified through Home Affairs.
 
-This code will expire in 10 minutes.
+Verified Details:
+Name: ${firstName} ${lastName}
+ID Number: ${idNumber.substring(0, 6)}******
 
-Enter this code in WhatsApp to complete your registration.
+Next Steps:
+1. Complete your registration on WhatsApp
+2. Upload required documents
+3. Start receiving job notifications
 
-If you didn't request this code, please ignore this email.
+Continue your registration on WhatsApp to complete your profile.
 
 Need help?
 WhatsApp: +27 73 089 9949
 Email: support@justwork.co.za
-Web: justwork.co.za
 
-© ${new Date().getFullYear()} JUST WORK
+© ${new Date().getFullYear()} JustWork Mining
       `.trim()
     }
 
-    console.log('📤 Sending message with from:', messageData.from)
-    console.log('📤 Using domain:', process.env.MAILGUN_DOMAIN)
-    
     const result = await mg.messages.create(
       process.env.MAILGUN_DOMAIN || '', 
       messageData
     )
 
-    console.log('✅ Verification email sent via Mailgun:', result)
+    console.log('✅ ID verification email sent:', result)
     return result
   } catch (error) {
     console.error('❌ Mailgun error:', error)
-    
-    // Detailed error logging
-    if (error && typeof error === 'object') {
-      console.error('❌ Error details:', {
-        message: (error as any).message,
-        status: (error as any).status,
-        statusCode: (error as any).statusCode,
-        details: (error as any).details,
-        body: (error as any).body,
-        response: (error as any).response,
-        stack: (error as any).stack
-      })
-    }
-    
     throw error
   }
 }
 
-// Optional: Send welcome email after registration
+// ═══════════════════════════════════════════════════════════════
+// SEND REGISTRATION COMPLETE EMAIL
+// ═══════════════════════════════════════════════════════════════
 export async function sendWelcomeEmail(
   to: string,
   firstName: string,
-  userType: 'client' | 'provider'
+  experienceLevel: 'general_worker' | 'semi_skilled' | 'skilled_worker' | 'professional'
 ) {
-  const welcomeMessage = userType === 'client'
-    ? 'You can now post jobs and find trusted service providers across South Africa.'
-    : 'You can now browse jobs and start earning by offering your services.'
+  const levelLabels = {
+    general_worker: 'General Worker',
+    semi_skilled: 'Semi-Skilled Worker',
+    skilled_worker: 'Skilled Worker',
+    professional: 'Professional'
+  }
+
+  const levelLabel = levelLabels[experienceLevel] || 'Applicant'
 
   try {
     console.log('📧 Sending welcome email to:', to)
     
     const result = await mg.messages.create(process.env.MAILGUN_DOMAIN || '', {
-      from: `JUST WORK <${process.env.MAILGUN_FROM_EMAIL || 'noreply@justwork.co.za'}>`,
+      from: `JustWork Mining <${process.env.MAILGUN_FROM_EMAIL || 'noreply@justwork.co.za'}>`,
       to: [to],
-      subject: `Welcome to JUST WORK, ${firstName}! 🎉`,
+      subject: `Welcome to JustWork Mining, ${firstName}! 🎉`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -238,50 +207,105 @@ export async function sendWelcomeEmail(
                 background: #f9f9f9;
                 border-radius: 10px;
                 padding: 30px;
+                border: 2px solid #d97706;
+              }
+              .badge {
+                background: #d97706;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                display: inline-block;
+                font-weight: bold;
+                margin: 10px 0;
               }
               .button {
                 display: inline-block;
-                background: #0066cc;
+                background: #d97706;
                 color: white;
                 padding: 12px 30px;
                 text-decoration: none;
                 border-radius: 5px;
                 margin: 20px 0;
+                font-weight: bold;
+              }
+              ul {
+                padding-left: 20px;
+              }
+              li {
+                margin: 10px 0;
               }
             </style>
           </head>
           <body>
             <div class="container">
-              <h1>🎉 Welcome to JUST WORK!</h1>
+              <h1>🎉 Welcome to JustWork Mining!</h1>
               
               <p>Hi ${firstName},</p>
               
-              <p>Your registration is complete! ${welcomeMessage}</p>
+              <p>Your registration is complete! 🇿🇦⛏️</p>
               
-              <p><strong>What's next?</strong></p>
+              <span class="badge">${levelLabel}</span>
+              
+              <p><strong>What happens next:</strong></p>
               <ul>
-                ${userType === 'client' 
-                  ? `
-                    <li>📝 Post your first job via WhatsApp</li>
-                    <li>👀 Review applications from providers</li>
-                    <li>✅ Choose the best match for your needs</li>
-                  `
-                  : `
-                    <li>🔍 Browse available jobs</li>
-                    <li>💼 Submit competitive quotes</li>
-                    <li>💰 Get paid for completed work</li>
-                  `
-                }
+                <li>💼 You'll receive WhatsApp notifications when new jobs matching your profile are posted</li>
+                <li>📅 Get interview invitations directly on WhatsApp</li>
+                <li>🎯 Receive job offers when companies want to hire you</li>
+                <li>📄 Update your documents anytime via WhatsApp</li>
               </ul>
               
-              <p>Simply message us on WhatsApp to get started:</p>
-              <a href="https://wa.me/27730899949" class="button">Open WhatsApp</a>
+              <p><strong>Top Mining Companies Hiring:</strong></p>
+              <ul>
+                <li>⛏️ Anglo American</li>
+                <li>⛏️ Sibanye-Stillwater</li>
+                <li>⛏️ Gold Fields</li>
+                <li>⛏️ Harmony Gold</li>
+                <li>⛏️ Impala Platinum</li>
+              </ul>
               
-              <p>Happy ${userType === 'client' ? 'hiring' : 'working'}! 🇿🇦</p>
+              <p>Keep your WhatsApp active to receive job notifications!</p>
+              
+              <a href="https://wa.me/27730899949" class="button">Message Us on WhatsApp</a>
+              
+              <p style="margin-top: 30px; font-size: 14px; color: #666;">
+                <strong>Need help?</strong><br>
+                Reply to this email or WhatsApp us at +27 73 089 9949
+              </p>
             </div>
           </body>
         </html>
-      `
+      `,
+      text: `
+Hi ${firstName},
+
+Welcome to JustWork Mining!
+
+Your registration is complete! 🇿🇦⛏️
+
+Profile: ${levelLabel}
+
+What happens next:
+• You'll receive WhatsApp notifications when new jobs matching your profile are posted
+• Get interview invitations directly on WhatsApp
+• Receive job offers when companies want to hire you
+• Update your documents anytime via WhatsApp
+
+Top Mining Companies Hiring:
+• Anglo American
+• Sibanye-Stillwater
+• Gold Fields
+• Harmony Gold
+• Impala Platinum
+
+Keep your WhatsApp active to receive job notifications!
+
+Message us: https://wa.me/27730899949
+
+Need help?
+Reply to this email or WhatsApp: +27 73 089 9949
+
+© ${new Date().getFullYear()} JustWork Mining
+      `.trim()
     })
 
     console.log('✅ Welcome email sent:', result)
@@ -299,4 +323,217 @@ export async function sendWelcomeEmail(
     
     // Don't throw - welcome email is optional
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SEND JOB ALERT EMAIL
+// ═══════════════════════════════════════════════════════════════
+export async function sendJobAlertEmail(
+  to: string,
+  firstName: string,
+  jobDetails: {
+    jobTitle: string
+    companyName: string
+    location: string
+    salaryMin: number
+    salaryMax: number
+    jobId: string
+  }
+) {
+  try {
+    console.log('📧 Sending job alert email to:', to)
+    
+    const result = await mg.messages.create(process.env.MAILGUN_DOMAIN || '', {
+      from: `JustWork Mining Jobs <${process.env.MAILGUN_FROM_EMAIL || 'jobs@justwork.co.za'}>`,
+      to: [to],
+      subject: `New Job: ${jobDetails.jobTitle} at ${jobDetails.companyName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .container {
+                background: #ffffff;
+                border-radius: 10px;
+                padding: 30px;
+                border: 2px solid #d97706;
+              }
+              .job-title {
+                font-size: 24px;
+                font-weight: bold;
+                color: #d97706;
+                margin: 20px 0;
+              }
+              .detail-row {
+                padding: 10px 0;
+                border-bottom: 1px solid #eee;
+              }
+              .button {
+                display: inline-block;
+                background: #d97706;
+                color: white;
+                padding: 15px 40px;
+                text-decoration: none;
+                border-radius: 5px;
+                margin: 20px 0;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>🔔 New Job Alert!</h1>
+              
+              <p>Hi ${firstName},</p>
+              
+              <p>A new position matching your profile is available:</p>
+              
+              <div class="job-title">📋 ${jobDetails.jobTitle}</div>
+              
+              <div class="detail-row">
+                <strong>⛏️ Company:</strong> ${jobDetails.companyName}
+              </div>
+              <div class="detail-row">
+                <strong>📍 Location:</strong> ${jobDetails.location}
+              </div>
+              <div class="detail-row">
+                <strong>💰 Salary:</strong> R${jobDetails.salaryMin.toLocaleString()} - R${jobDetails.salaryMax.toLocaleString()}/month
+              </div>
+              
+              <p style="margin-top: 30px;">
+                <a href="https://justwork.co.za/mining/jobs/${jobDetails.jobId}" class="button">View Full Details</a>
+              </p>
+              
+              <p>Or reply <strong>'APPLY ${jobDetails.jobId}'</strong> on WhatsApp to apply now!</p>
+            </div>
+          </body>
+        </html>
+      `
+    })
+
+    console.log('✅ Job alert email sent:', result)
+    return result
+  } catch (error) {
+    console.error('❌ Failed to send job alert email:', error)
+    // Don't throw - email is supplementary to WhatsApp
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SEND INTERVIEW INVITATION EMAIL
+// ═══════════════════════════════════════════════════════════════
+export async function sendInterviewInvitationEmail(
+  to: string,
+  firstName: string,
+  interviewDetails: {
+    jobTitle: string
+    companyName: string
+    date: string
+    time: string
+    location: string
+    contactNumber: string
+  }
+) {
+  try {
+    console.log('📧 Sending interview invitation email to:', to)
+    
+    const result = await mg.messages.create(process.env.MAILGUN_DOMAIN || '', {
+      from: `JustWork Mining <${process.env.MAILGUN_FROM_EMAIL || 'noreply@justwork.co.za'}>`,
+      to: [to],
+      subject: `Interview Invitation: ${interviewDetails.jobTitle}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .container {
+                background: #f0fdf4;
+                border-radius: 10px;
+                padding: 30px;
+                border: 2px solid #16a34a;
+              }
+              .highlight {
+                background: #16a34a;
+                color: white;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+              }
+              .detail {
+                margin: 10px 0;
+                font-size: 16px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>🎯 Interview Invitation!</h1>
+              
+              <p>Congratulations ${firstName}!</p>
+              
+              <p>You've been invited for an interview:</p>
+              
+              <div class="highlight">
+                <div class="detail"><strong>📋 Position:</strong> ${interviewDetails.jobTitle}</div>
+                <div class="detail"><strong>⛏️ Company:</strong> ${interviewDetails.companyName}</div>
+                <div class="detail"><strong>📅 Date:</strong> ${interviewDetails.date}</div>
+                <div class="detail"><strong>🕐 Time:</strong> ${interviewDetails.time}</div>
+                <div class="detail"><strong>📍 Location:</strong> ${interviewDetails.location}</div>
+              </div>
+              
+              <p><strong>What to bring:</strong></p>
+              <ul>
+                <li>Original ID Document</li>
+                <li>Copies of all certificates</li>
+                <li>Updated CV (if applicable)</li>
+                <li>Reference letters (if available)</li>
+              </ul>
+              
+              <p><strong>Questions?</strong> Call ${interviewDetails.contactNumber}</p>
+              
+              <p style="margin-top: 30px; color: #16a34a; font-weight: bold;">
+                Confirm your attendance on WhatsApp!
+              </p>
+            </div>
+          </body>
+        </html>
+      `
+    })
+
+    console.log('✅ Interview invitation email sent:', result)
+    return result
+  } catch (error) {
+    console.error('❌ Failed to send interview invitation email:', error)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEGACY FUNCTION (Keep for backward compatibility)
+// ═══════════════════════════════════════════════════════════════
+export async function sendVerificationEmail(
+  to: string,
+  code: string,
+  firstName: string
+) {
+  // For mining, we don't use verification codes
+  // But keep this for backward compatibility
+  return sendIDVerificationEmail(to, firstName, '', '')
 }
