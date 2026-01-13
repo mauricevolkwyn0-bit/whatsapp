@@ -546,7 +546,6 @@ async function handleInteractiveMessage(
 }
 
 async function handleCategorySelection(from: string, category: string, stateData: any) {
-    // Get titles for this category
     const titlesForCategory = JOB_TITLES.filter(job => job.category === category)
 
     if (titlesForCategory.length === 0) {
@@ -559,12 +558,35 @@ async function handleCategorySelection(from: string, category: string, stateData
         selected_category: category
     })
 
-    // Create interactive list with titles
-    const rows = titlesForCategory.map(job => ({
-        id: job.id,
-        title: job.title,
-        description: `${job.required_certificates.length} docs required`
-    }))
+    // ✅ FIX: Truncate titles and descriptions to meet WhatsApp limits
+    const rows = titlesForCategory.map(job => {
+        let displayTitle = job.title
+        
+        // WhatsApp limit: title must be 1-24 characters
+        if (displayTitle.length > 24) {
+            displayTitle = displayTitle.substring(0, 21) + '...'
+        }
+        
+        // WhatsApp limit: description must be 1-72 characters
+        const certCount = job.required_certificates.length
+        const certWord = certCount === 1 ? 'cert' : 'certs'
+        
+        return {
+            id: job.id,
+            title: displayTitle,
+            description: `${certCount} ${certWord} required`
+        }
+    }).slice(0, 10) // WhatsApp limit: max 10 rows per section
+
+    // ✅ Also truncate section title (24 char limit)
+    let sectionTitle = getCategoryLabel(category)
+    
+    // Remove emojis first to save space
+    sectionTitle = sectionTitle.replace(/[🔧⚙️👷👔]/g, '').trim()
+    
+    if (sectionTitle.length > 24) {
+        sectionTitle = sectionTitle.substring(0, 21) + '...'
+    }
 
     await sendInteractiveList(from,
         `📋 *Select Your Job Title*
@@ -573,8 +595,8 @@ Choose the position you're qualified for:`,
         'Choose Title',
         [
             {
-                title: getCategoryLabel(category),
-                rows: rows.slice(0, 10) // WhatsApp limit: 10 items per section
+                title: sectionTitle,
+                rows: rows
             }
         ]
     )
@@ -989,10 +1011,10 @@ function getDocumentTypeEnum(docName: string): string {
 
 function getCategoryLabel(category: string): string {
     const labels: Record<string, string> = {
-        'general_worker': '🔧 General Worker Positions',
-        'semi_skilled': '⚙️ Semi-Skilled Positions',
-        'skilled': '👷 Skilled Positions',
-        'professional': '👔 Professional Positions'
+        'general_worker': 'General Worker',      // 14 chars ✅
+        'semi_skilled': 'Semi-Skilled',           // 12 chars ✅
+        'skilled': 'Skilled Trades',              // 14 chars ✅
+        'professional': 'Professional'            // 12 chars ✅
     }
     return labels[category] || category
 }
