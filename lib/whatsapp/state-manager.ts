@@ -2,412 +2,175 @@
 import { getSupabaseServer } from '@/lib/supabase/server'
 
 // ═══════════════════════════════════════════════════════════════
-// CONVERSATION STATES
+// CONVERSATION STATES - UPDATED FOR NEW REGISTRATION FLOW
 // ═══════════════════════════════════════════════════════════════
 export type ConversationState =
-  // General
-  | 'IDLE'
-  | 'CHOOSING_USER_TYPE'
-  
-  // Mining Applicant Registration
-  | 'APPLICANT_REG_ID_NUMBER'
-  | 'APPLICANT_REG_ID_UPLOAD'
-  | 'APPLICANT_REG_EMAIL'
-  | 'APPLICANT_REG_ADDRESS'
-  | 'APPLICANT_REG_SELECTING_LEVEL'
-  | 'APPLICANT_REG_UPLOADING_DOCS'
-  | 'APPLICANT_REG_COMPLETE'
-  
-  // Document Uploads by Level
-  | 'UPLOADING_GENERAL_WORKER_DOCS'
-  | 'UPLOADING_SEMI_SKILLED_DOCS'
-  | 'UPLOADING_SKILLED_WORKER_DOCS'
-  | 'UPLOADING_PROFESSIONAL_DOCS'
-  
-  // Profile Management
-  | 'UPDATING_PROFILE'
-  | 'UPDATING_CONTACT'
-  | 'UPDATING_DOCUMENTS'
-  | 'UPDATING_QUALIFICATIONS'
-  
-  // Job Notifications & Actions
-  | 'VIEWING_JOB_DETAILS'
-  | 'VIEWING_INTERVIEW_DETAILS'
-  | 'CONFIRMING_INTERVIEW'
-  | 'VIEWING_JOB_OFFER'
-  | 'ACCEPTING_JOB_OFFER'
-  
-  // Legacy states (keep for backward compatibility)
-  | 'CLIENT_REG_NAME'
-  | 'CLIENT_REG_SURNAME'
-  | 'CLIENT_REG_EMAIL'
-  | 'CLIENT_REG_VERIFICATION'
-  | 'SELECTING_JOB_CATEGORY'
-  | 'PROVIDER_REG_NAME'
-  | 'PROVIDER_REG_SURNAME'
-  | 'PROVIDER_REG_EMAIL'
-  | 'PROVIDER_REG_CATEGORY'
-  | 'PROVIDER_REG_EXPERIENCE'
-  | 'PROVIDER_REG_CV'
-  | 'PROVIDER_REG_PORTFOLIO'
-  | 'PROVIDER_REG_ADDRESS'
-  | 'PROVIDER_REG_VERIFICATION'
-  | 'POSTING_JOB_TITLE'
-  | 'POSTING_JOB_DESCRIPTION'
-  | 'POSTING_JOB_BUDGET'
-  | 'POSTING_JOB_LOCATION'
-  | 'POSTING_JOB_IMAGES'
-  | 'CONFIRMING_JOB'
-  | 'APPLYING_PRICE'
-  | 'APPLYING_AVAILABILITY'
-  | 'APPLYING_MESSAGE'
-  | 'REVIEWING_APPLICATIONS'
-  | 'RATING_PROVIDER'
-  | 'RATING_CLIENT'
-  | 'REVIEW_COMMENT'
-  | 'PENDING_JOB_POST'
-  | 'PENDING_FIND_JOBS'
-  | 'WITHDRAWAL_AMOUNT'
-  | 'WITHDRAWAL_BANK_DETAILS'
-
-// ═══════════════════════════════════════════════════════════════
-// STATE DATA INTERFACE
-// ═══════════════════════════════════════════════════════════════
-export interface StateData {
-  // User info
-  userId?: string
-  userType?: 'client' | 'provider' | 'applicant'
-  
-  // Mining-specific fields
-  id_number?: string
-  id_document_url?: string
-  home_affairs_verified?: boolean
-  physical_address?: string
-  experience_level?: 'general_worker' | 'semi_skilled' | 'skilled_worker' | 'professional'
-  uploaded_documents?: Record<string, string> // document_type -> url
-  pending_documents?: string[] // List of documents still needed
-  applicant_id?: string
-  date_of_birth?: string
-  age?: number
-  gender?: string
-  citizenship?: string
-  last_name?: string
-  
-  // Job notification fields
-  job_posting_id?: string
-  interview_id?: string
-  offer_id?: string
-  
-  // Legacy/Original fields
-  user_type?: 'client' | 'provider'
-  first_name?: string
-  surname?: string
-  email?: string
-  verification_code?: string
-  verification_expires_at?: string
-  category?: string
-  category_id?: string
-  category_name?: string
-  experience?: string
-  experience_years?: number
-  cv_url?: string
-  cv_document_id?: string
-  portfolio_urls?: string[]
-  portfolio_images?: string[]
-  address?: string
-  
-  // Job posting
-  title?: string
-  description?: string
-  budget_min?: number
-  budget_max?: number
-  latitude?: number
-  longitude?: number
-  location_text?: string
-  location_address?: string
-  images?: string[]
-  job_id?: string
-  
-  // Job application
-  application_id?: string
-  proposed_amount?: number
-  availability?: string
-  cover_letter?: string
-  
-  // Reviews
-  assignment_id?: string
-  rating?: number
-  comment?: string
-  
-  // Other
-  [key: string]: any
-}
+    // General states
+    | 'IDLE'
+    | 'CHOOSING_USER_TYPE'
+    
+    // ✅ NEW REGISTRATION FLOW
+    | 'APPLICANT_REG_ID_NUMBER'           // Step 1: Enter ID number
+    | 'APPLICANT_REG_ID_UPLOAD'           // Step 2: Upload ID document
+    | 'APPLICANT_REG_SELFIE'              // Step 3: Upload selfie
+    | 'APPLICANT_REG_EMAIL'               // Step 4: Enter email
+    | 'APPLICANT_REG_LOCATION'            // Step 5: Enter location
+    | 'APPLICANT_REG_SELECTING_CATEGORY'  // Step 6: Select category
+    | 'APPLICANT_REG_SELECTING_TITLE'     // Step 7: Select job title
+    | 'UPLOADING_REQUIRED_DOCS'           // Step 8: Upload required documents
+    
+    // OLD STATES (kept for backwards compatibility)
+    | 'APPLICANT_REG_ADDRESS'
+    | 'APPLICANT_REG_SELECTING_LEVEL'
+    | 'APPLICANT_REG_UPLOADING_DOCS'
+    | 'UPLOADING_GENERAL_WORKER_DOCS'
+    | 'UPLOADING_SEMI_SKILLED_DOCS'
+    | 'UPLOADING_SKILLED_WORKER_DOCS'
+    | 'UPLOADING_PROFESSIONAL_DOCS'
+    
+    // Client states
+    | 'CLIENT_REG_COMPANY_NAME'
+    | 'CLIENT_REG_INDUSTRY'
+    | 'CLIENT_REG_EMAIL'
+    | 'CLIENT_REG_PHYSICAL_ADDRESS'
+    | 'CLIENT_REG_UPLOAD_DOCS'
+    | 'CLIENT_POSTING_JOB_TITLE'
+    | 'CLIENT_POSTING_JOB_DESCRIPTION'
+    | 'CLIENT_POSTING_JOB_LOCATION'
+    | 'CLIENT_POSTING_JOB_SALARY'
+    | 'CLIENT_POSTING_JOB_REQUIREMENTS'
+    | 'CLIENT_VIEWING_APPLICATIONS'
+    | 'CLIENT_REVIEWING_APPLICATION'
+    
+    // Provider states (for future use)
+    | 'PROVIDER_REG_BUSINESS_NAME'
+    | 'PROVIDER_REG_SERVICE_TYPE'
+    | 'PROVIDER_REG_EMAIL'
+    | 'PROVIDER_REG_PHYSICAL_ADDRESS'
+    | 'PROVIDER_REG_UPLOAD_DOCS'
+    | 'PROVIDER_BROWSING_JOBS'
+    | 'PROVIDER_APPLYING_FOR_JOB'
+    | 'PROVIDER_VIEWING_APPLICATIONS'
+    
+    // Job application states
+    | 'BROWSING_JOBS'
+    | 'VIEWING_JOB_DETAILS'
+    | 'APPLYING_FOR_JOB'
+    | 'UPLOADING_APPLICATION_DOCS'
+    | 'VIEWING_MY_APPLICATIONS'
+    | 'VIEWING_APPLICATION_STATUS'
+    
+    // Interview states
+    | 'SCHEDULING_INTERVIEW'
+    | 'CONFIRMING_INTERVIEW'
+    | 'RESCHEDULING_INTERVIEW'
+    | 'VIEWING_UPCOMING_INTERVIEWS'
+    
+    // Payment states
+    | 'PROCESSING_PAYMENT'
+    | 'CONFIRMING_PAYMENT'
+    | 'VIEWING_PAYMENT_HISTORY'
+    | 'WITHDRAWAL_AMOUNT'
+    | 'WITHDRAWAL_BANK_DETAILS'
 
 // ═══════════════════════════════════════════════════════════════
 // GET CONVERSATION STATE
 // ═══════════════════════════════════════════════════════════════
 export async function getConversationState(whatsappNumber: string) {
-  try {
-    const supabase = getSupabaseServer()
-    
-    const { data, error } = await supabase
-      .from('whatsapp_conversation_states')
-      .select('*')
-      .eq('whatsapp_number', whatsappNumber)
-      .maybeSingle()
+    try {
+        const supabase = getSupabaseServer()
+        
+        const { data, error } = await supabase
+            .from('whatsapp_conversation_states')
+            .select('*')
+            .eq('whatsapp_number', whatsappNumber)
+            .single()
 
-    if (error) {
-      console.error('Error fetching conversation state:', error)
-      return null
+        if (error) {
+            if (error.code === 'PGRST116') {
+                // No state found - return null
+                return null
+            }
+            throw error
+        }
+
+        return data
+    } catch (error) {
+        console.error('Error getting conversation state:', error)
+        return null
     }
-
-    return data
-  } catch (error) {
-    console.error('Error in getConversationState:', error)
-    return null
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
 // UPDATE CONVERSATION STATE
 // ═══════════════════════════════════════════════════════════════
 export async function updateConversationState(
-  whatsappNumber: string,
-  newState: ConversationState,
-  data: StateData = {}
+    whatsappNumber: string,
+    newState: ConversationState,
+    data: any = {}
 ) {
-  try {
-    const supabase = getSupabaseServer()
-    
-    const { error } = await supabase
-      .from('whatsapp_conversation_states')
-      .upsert(
-        {
-          whatsapp_number: whatsappNumber,
-          current_state: newState,
-          data: data,
-          last_message_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'whatsapp_number',
+    try {
+        const supabase = getSupabaseServer()
+
+        // Check if state exists
+        const existingState = await getConversationState(whatsappNumber)
+
+        if (existingState) {
+            // Update existing state
+            const { error } = await supabase
+                .from('whatsapp_conversation_states')
+                .update({
+                    current_state: newState,
+                    data: data,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('whatsapp_number', whatsappNumber)
+
+            if (error) throw error
+        } else {
+            // Create new state
+            const { error } = await supabase
+                .from('whatsapp_conversation_states')
+                .insert({
+                    whatsapp_number: whatsappNumber,
+                    current_state: newState,
+                    data: data
+                })
+
+            if (error) throw error
         }
-      )
 
-    if (error) {
-      console.error('Error updating conversation state:', error)
-      throw error
+        console.log(`✅ State updated: ${whatsappNumber} → ${newState}`)
+    } catch (error) {
+        console.error('Error updating conversation state:', error)
+        throw error
     }
-
-    console.log(`✅ State updated: ${whatsappNumber} → ${newState}`)
-  } catch (error) {
-    console.error('Error in updateConversationState:', error)
-    throw error
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// UPDATE STATE DATA (Keep current state, update data only)
-// ═══════════════════════════════════════════════════════════════
-export async function updateStateData(
-  whatsappNumber: string,
-  newData: StateData
-) {
-  try {
-    const state = await getConversationState(whatsappNumber)
-
-    if (!state) {
-      console.warn(`No state found for ${whatsappNumber}, creating new state`)
-      await updateConversationState(whatsappNumber, 'IDLE', newData)
-      return
-    }
-
-    const currentState = (state.current_state as ConversationState) || 'IDLE'
-    const currentData = (state.data || {}) as StateData
-
-    await updateConversationState(
-      whatsappNumber,
-      currentState,
-      { ...currentData, ...newData }
-    )
-  } catch (error) {
-    console.error('Error in updateStateData:', error)
-    throw error
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
 // CLEAR CONVERSATION STATE
 // ═══════════════════════════════════════════════════════════════
 export async function clearConversationState(whatsappNumber: string) {
-  try {
-    const supabase = getSupabaseServer()
-    
-    const { error } = await supabase
-      .from('whatsapp_conversation_states')
-      .delete()
-      .eq('whatsapp_number', whatsappNumber)
+    try {
+        const supabase = getSupabaseServer()
 
-    if (error) {
-      console.error('Error clearing conversation state:', error)
-      throw error
+        const { error } = await supabase
+            .from('whatsapp_conversation_states')
+            .delete()
+            .eq('whatsapp_number', whatsappNumber)
+
+        if (error) throw error
+
+        console.log(`✅ State cleared: ${whatsappNumber}`)
+    } catch (error) {
+        console.error('Error clearing conversation state:', error)
+        throw error
     }
-
-    console.log(`✅ State cleared for ${whatsappNumber}`)
-  } catch (error) {
-    console.error('Error in clearConversationState:', error)
-    throw error
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
 // RESET TO IDLE STATE
 // ═══════════════════════════════════════════════════════════════
-export async function resetToIdle(
-  whatsappNumber: string,
-  preserveData?: Partial<StateData>
-) {
-  try {
-    await updateConversationState(
-      whatsappNumber,
-      'IDLE',
-      preserveData || {}
-    )
-    console.log(`✅ State reset to IDLE for ${whatsappNumber}`)
-  } catch (error) {
-    console.error('Error in resetToIdle:', error)
-    throw error
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// GET STATE DATA (Helper to get just the data object)
-// ═══════════════════════════════════════════════════════════════
-export async function getStateData(whatsappNumber: string): Promise<StateData> {
-  const state = await getConversationState(whatsappNumber)
-  return (state?.data || {}) as StateData
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CHECK IF STATE EXISTS
-// ═══════════════════════════════════════════════════════════════
-export async function hasConversationState(whatsappNumber: string): Promise<boolean> {
-  const state = await getConversationState(whatsappNumber)
-  return state !== null
-}
-
-// ═══════════════════════════════════════════════════════════════
-// GET CURRENT STATE (Helper to get just the state string)
-// ═══════════════════════════════════════════════════════════════
-export async function getCurrentState(whatsappNumber: string): Promise<ConversationState> {
-  const state = await getConversationState(whatsappNumber)
-  return (state?.current_state as ConversationState) || 'IDLE'
-}
-
-// ═══════════════════════════════════════════════════════════════
-// APPEND TO ARRAY IN STATE DATA
-// ═══════════════════════════════════════════════════════════════
-export async function appendToStateArray(
-  whatsappNumber: string,
-  arrayKey: string,
-  value: any
-) {
-  const stateData = await getStateData(whatsappNumber)
-  const currentArray = (stateData[arrayKey] || []) as any[]
-  
-  await updateStateData(whatsappNumber, {
-    [arrayKey]: [...currentArray, value]
-  })
-}
-
-// ═══════════════════════════════════════════════════════════════
-// REMOVE FROM ARRAY IN STATE DATA
-// ═══════════════════════════════════════════════════════════════
-export async function removeFromStateArray(
-  whatsappNumber: string,
-  arrayKey: string,
-  index: number
-) {
-  const stateData = await getStateData(whatsappNumber)
-  const currentArray = (stateData[arrayKey] || []) as any[]
-  
-  const newArray = currentArray.filter((_, i) => i !== index)
-  
-  await updateStateData(whatsappNumber, {
-    [arrayKey]: newArray
-  })
-}
-
-// ═══════════════════════════════════════════════════════════════
-// INCREMENT NUMBER IN STATE DATA
-// ═══════════════════════════════════════════════════════════════
-export async function incrementStateValue(
-  whatsappNumber: string,
-  key: string,
-  amount: number = 1
-) {
-  const stateData = await getStateData(whatsappNumber)
-  const currentValue = (stateData[key] || 0) as number
-  
-  await updateStateData(whatsappNumber, {
-    [key]: currentValue + amount
-  })
-}
-
-// ═══════════════════════════════════════════════════════════════
-// STATE VALIDATION HELPERS
-// ═══════════════════════════════════════════════════════════════
-export function isRegistrationState(state: ConversationState): boolean {
-  return state.includes('REG_')
-}
-
-export function isJobPostingState(state: ConversationState): boolean {
-  return state.includes('POSTING_JOB_')
-}
-
-export function isApplicationState(state: ConversationState): boolean {
-  return state.includes('APPLYING_')
-}
-
-export function isReviewState(state: ConversationState): boolean {
-  return state.includes('RATING_') || state.includes('REVIEW_')
-}
-
-export function isMiningApplicantState(state: ConversationState): boolean {
-  return state.includes('APPLICANT_REG_') || state.includes('UPLOADING_')
-}
-
-export function isProfileUpdateState(state: ConversationState): boolean {
-  return state.includes('UPDATING_')
-}
-
-export function isJobNotificationState(state: ConversationState): boolean {
-  return state.includes('VIEWING_') || state.includes('CONFIRMING_') || state.includes('ACCEPTING_')
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CLEANUP OLD STATES (Run periodically)
-// ═══════════════════════════════════════════════════════════════
-export async function cleanupOldStates(daysOld: number = 7) {
-  try {
-    const supabase = getSupabaseServer()
-    
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld)
-
-    const { error } = await supabase
-      .from('whatsapp_conversation_states')
-      .delete()
-      .lt('last_message_at', cutoffDate.toISOString())
-
-    if (error) {
-      console.error('Error cleaning up old states:', error)
-      throw error
-    }
-
-    console.log(`✅ Cleaned up states older than ${daysOld} days`)
-  } catch (error) {
-    console.error('Error in cleanupOldStates:', error)
-    throw error
-  }
+export async function resetToIdle(whatsappNumber: string) {
+    await updateConversationState(whatsappNumber, 'IDLE', {})
 }

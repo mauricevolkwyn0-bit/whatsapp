@@ -27,55 +27,127 @@ const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'justwork_mining_2025'
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN!
 
 // ═══════════════════════════════════════════════════════════════
-// EXPERIENCE LEVELS & REQUIRED DOCUMENTS
+// JOB TITLES DATA (from your database)
 // ═══════════════════════════════════════════════════════════════
-const EXPERIENCE_LEVELS = {
-    general_worker: {
-        label: '🔧 General Worker',
-        description: 'Entry-level mining positions',
-        required_documents: [
-            'Proof of Address',
-            'Matric Certificate'
-        ]
+const JOB_TITLES = [
+    {
+        id: "55ffbb89-14fa-4eb8-9f51-8ddcb5d2da42",
+        category: "general_worker",
+        title: "General Mine Worker",
+        required_certificates: ["ID Document", "Medical Certificate"]
     },
-    semi_skilled: {
-        label: '⚙️ Semi-Skilled Worker',
-        description: 'Operators, drillers, etc.',
-        required_documents: [
-            'Proof of Address',
-            'Matric Certificate',
-            'Trade Certificate',
-            'Medical Certificate'
-        ]
+    {
+        id: "66bee395-d051-4e62-b2d0-342e4c8f0d75",
+        category: "general_worker",
+        title: "Surface Worker",
+        required_certificates: ["ID Document", "Medical Certificate"]
     },
-    skilled_worker: {
-        label: '👷 Skilled Worker',
-        description: 'Artisans, technicians, supervisors',
-        required_documents: [
-            'Proof of Address',
-            'Matric Certificate',
-            'Trade Test Certificate',
-            'Blasting Certificate',
-            'Medical Certificate',
-            'CV'
-        ]
+    {
+        id: "e8aff06e-9373-4548-880a-a892b2aa4990",
+        category: "general_worker",
+        title: "Helper",
+        required_certificates: ["ID Document"]
     },
-    professional: {
-        label: '👔 Professional',
-        description: 'Engineers, geologists, managers',
-        required_documents: [
-            'Proof of Address',
-            'Matric Certificate',
-            'Degree/Diploma',
-            'Professional Registration',
-            'Medical Certificate',
-            'CV'
-        ]
+    {
+        id: "9b157f2f-fa57-42c4-8a4f-bd1ae7612185",
+        category: "semi_skilled",
+        title: "Drill Operator",
+        required_certificates: ["Drill Operator Certificate", "Medical Certificate"]
+    },
+    {
+        id: "dd61c9ba-7b5b-4693-ba69-f1e997cab316",
+        category: "semi_skilled",
+        title: "Machine Operator",
+        required_certificates: ["Machine Operator License", "Safety Certificate"]
+    },
+    {
+        id: "d0f481ed-2d91-4d08-8fc6-0aff60201687",
+        category: "semi_skilled",
+        title: "Winch Operator",
+        required_certificates: ["Winch Operator Certificate"]
+    },
+    {
+        id: "22668ddf-3acd-44c5-917d-02c55c3f414b",
+        category: "semi_skilled",
+        title: "Plant Operator",
+        required_certificates: ["Plant Operator License"]
+    },
+    {
+        id: "88cec300-a19f-4b9a-88bc-a69bc6357b62",
+        category: "skilled",
+        title: "Electrician",
+        required_certificates: ["Trade Test Certificate", "Wireman License"]
+    },
+    {
+        id: "5e6d9c95-2bd6-4dbd-a273-e5207d21aed0",
+        category: "skilled",
+        title: "Fitter",
+        required_certificates: ["Trade Test Certificate"]
+    },
+    {
+        id: "78453f90-c145-4ed5-922a-4f106ed2d06e",
+        category: "skilled",
+        title: "Welder",
+        required_certificates: ["Trade Test Certificate", "Welding Certificate"]
+    },
+    {
+        id: "4d6988f7-9995-4048-8569-3ebb5e630837",
+        category: "skilled",
+        title: "Boilermaker",
+        required_certificates: ["Trade Test Certificate"]
+    },
+    {
+        id: "dd4a2bd7-677b-4310-8a04-683de46599e0",
+        category: "skilled",
+        title: "Diesel Mechanic",
+        required_certificates: ["Trade Test Certificate"]
+    },
+    {
+        id: "bb0e14f4-28d7-41fa-9199-6e6800b58cc0",
+        category: "skilled",
+        title: "Artisan",
+        required_certificates: ["Red Seal / Trade Test"]
+    },
+    {
+        id: "ba99711e-e0b8-4ebd-99ba-225aaa9e7c50",
+        category: "professional",
+        title: "Mine Engineer",
+        required_certificates: ["Engineering Degree", "Professional Registration"]
+    },
+    {
+        id: "f76a8ba6-910e-4a9e-840b-17c88684d473",
+        category: "professional",
+        title: "Safety Officer",
+        required_certificates: ["Safety Management Certificate", "SAMTRAC"]
+    },
+    {
+        id: "6e64ffad-c71a-433b-a97e-8291d7dbfd22",
+        category: "professional",
+        title: "Mine Supervisor",
+        required_certificates: ["Blasting Certificate", "Supervisory Certificate"]
+    },
+    {
+        id: "0107ae38-bb4e-479b-b7b6-b821ecf8d02f",
+        category: "professional",
+        title: "Shift Boss",
+        required_certificates: ["Blasting Certificate", "Mine Managers Certificate"]
+    },
+    {
+        id: "1635255c-00cb-461c-8b83-aa55d82771a6",
+        category: "professional",
+        title: "Mine Manager",
+        required_certificates: ["Mine Managers Certificate of Competency"]
+    },
+    {
+        id: "d3e3d82e-0dbf-4d5e-a31a-9b6b35efe83d",
+        category: "professional",
+        title: "Surveyor",
+        required_certificates: ["Surveying Degree", "Professional Registration"]
     }
-}
+]
 
 // ═══════════════════════════════════════════════════════════════
-// GET - WEBHOOK VERIFICATION (Required by Meta)
+// GET - WEBHOOK VERIFICATION
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
@@ -83,14 +155,10 @@ export async function GET(request: NextRequest) {
     const token = searchParams.get('hub.verify_token')
     const challenge = searchParams.get('hub.challenge')
 
-    console.log('📞 Webhook verification:', { mode, token })
-
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        console.log('✅ Webhook verified!')
         return new Response(challenge, { status: 200 })
     }
 
-    console.log('❌ Verification failed!')
     return new Response('Forbidden', { status: 403 })
 }
 
@@ -100,8 +168,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
-        console.log('📨 Webhook:', JSON.stringify(body, null, 2))
-
         const message = body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]
         if (!message) return NextResponse.json({ success: true })
 
@@ -111,12 +177,10 @@ export async function POST(request: NextRequest) {
 
         console.log(`💬 From ${from}: "${messageText}" (${messageType})`)
 
-        // Get conversation state
         const state = await getConversationState(from)
         const currentState = (state?.current_state as ConversationState) || 'IDLE'
         const stateData = state?.data || {}
 
-        // Route message
         if (messageType === 'text') {
             await handleTextMessage(from, messageText, currentState, stateData)
         } else if (messageType === 'interactive') {
@@ -168,14 +232,11 @@ async function handleTextMessage(
             await handleApplicantRegEmail(from, text, stateData)
             break
 
-        case 'APPLICANT_REG_ADDRESS':
-            await handleApplicantRegAddress(from, text, stateData)
+        case 'APPLICANT_REG_LOCATION':
+            await handleApplicantRegLocation(from, text, stateData)
             break
 
-        case 'UPLOADING_GENERAL_WORKER_DOCS':
-        case 'UPLOADING_SEMI_SKILLED_DOCS':
-        case 'UPLOADING_SKILLED_WORKER_DOCS':
-        case 'UPLOADING_PROFESSIONAL_DOCS':
+        case 'UPLOADING_REQUIRED_DOCS':
             if (textLower === 'skip') {
                 await skipCurrentDocument(from, currentState, stateData)
             } else {
@@ -189,7 +250,7 @@ async function handleTextMessage(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HANDLE GREETING
+// NEW FLOW: STEP 1 - GREETING → ID NUMBER
 // ═══════════════════════════════════════════════════════════════
 async function handleGreeting(from: string) {
     const applicant = await getApplicantByWhatsApp(from)
@@ -232,7 +293,7 @@ What would you like to do?`,
 }
 
 // ═══════════════════════════════════════════════════════════════
-// REGISTRATION: ID NUMBER
+// NEW FLOW: STEP 2 - ID NUMBER → ID UPLOAD
 // ═══════════════════════════════════════════════════════════════
 async function handleApplicantRegIDNumber(from: string, idNumber: string, stateData: any) {
     const cleaned = idNumber.replace(/\s/g, '')
@@ -273,6 +334,7 @@ Please verify and try again:`)
         home_affairs_verified: true
     })
 
+    // ✅ Use their actual name from Home Affairs
     await sendTextMessage(from,
         `✅ *Welcome ${homeAffairs.first_name} ${homeAffairs.last_name}!*
 
@@ -282,7 +344,75 @@ Your details have been verified.
 }
 
 // ═══════════════════════════════════════════════════════════════
-// REGISTRATION: EMAIL
+// NEW FLOW: STEP 3 - ID UPLOAD → SELFIE
+// ═══════════════════════════════════════════════════════════════
+async function handleDocumentMessage(
+    from: string,
+    message: any,
+    currentState: ConversationState,
+    stateData: any
+) {
+    const imageId = message.image?.id || message.document?.id
+
+    if (!imageId) {
+        await sendTextMessage(from, `Please upload as an image or PDF.`)
+        return
+    }
+
+    // STEP 3A: ID Document upload
+    if (currentState === 'APPLICANT_REG_ID_UPLOAD') {
+        try {
+            console.log('📥 Downloading ID document...')
+            const docData = await downloadDocumentAsBase64(imageId, 'id_document')
+
+            await updateConversationState(from, 'APPLICANT_REG_SELFIE', {
+                ...stateData,
+                id_document: docData
+            })
+
+            await sendTextMessage(from,
+                `✅ ID document received!
+
+📸 Now please upload a *selfie* (photo of your face):
+
+This helps us verify your identity.`)
+        } catch (error) {
+            console.error('❌ Upload failed:', error)
+            await sendTextMessage(from, `❌ Upload failed. Please try again.`)
+        }
+        return
+    }
+
+    // STEP 3B: Selfie upload → Email
+    if (currentState === 'APPLICANT_REG_SELFIE') {
+        try {
+            console.log('📥 Downloading selfie...')
+            const docData = await downloadDocumentAsBase64(imageId, 'selfie')
+
+            await updateConversationState(from, 'APPLICANT_REG_EMAIL', {
+                ...stateData,
+                selfie: docData
+            })
+
+            await sendTextMessage(from,
+                `✅ Selfie received!
+
+📧 Please enter your *email address*:`)
+        } catch (error) {
+            console.error('❌ Upload failed:', error)
+            await sendTextMessage(from, `❌ Upload failed. Please try again.`)
+        }
+        return
+    }
+
+    // STEP 7: Required documents upload
+    if (currentState === 'UPLOADING_REQUIRED_DOCS') {
+        await processDocumentUpload(from, message, currentState, stateData)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NEW FLOW: STEP 4 - EMAIL → LOCATION
 // ═══════════════════════════════════════════════════════════════
 async function handleApplicantRegEmail(from: string, email: string, stateData: any) {
     const emailLower = email.toLowerCase().trim()
@@ -304,7 +434,7 @@ async function handleApplicantRegEmail(from: string, email: string, stateData: a
         console.error('Email send failed:', error)
     }
 
-    await updateConversationState(from, 'APPLICANT_REG_ADDRESS', {
+    await updateConversationState(from, 'APPLICANT_REG_LOCATION', {
         ...stateData,
         email: emailLower
     })
@@ -312,41 +442,35 @@ async function handleApplicantRegEmail(from: string, email: string, stateData: a
     await sendTextMessage(from,
         `✅ Email saved: ${emailLower}
 
-📍 Please enter your *physical address*:
+📍 Please enter your *location* (city/town):
 
-Example: 123 Main Street, Johannesburg, 2001`)
+Example: Johannesburg, Rustenburg, Kimberley`)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// REGISTRATION: ADDRESS
+// NEW FLOW: STEP 5 - LOCATION → CATEGORY SELECTION
 // ═══════════════════════════════════════════════════════════════
-async function handleApplicantRegAddress(from: string, address: string, stateData: any) {
-    const addressClean = sanitizeInput(address)
+async function handleApplicantRegLocation(from: string, location: string, stateData: any) {
+    const locationClean = sanitizeInput(location)
 
-    if (!isValidSAAddress(addressClean)) {
-        await sendTextMessage(from,
-            `❌ Please enter a complete address (street, city, postal code):`)
-        return
-    }
-
-    await updateConversationState(from, 'APPLICANT_REG_SELECTING_LEVEL', {
+    await updateConversationState(from, 'APPLICANT_REG_SELECTING_CATEGORY', {
         ...stateData,
-        physical_address: addressClean
+        location: locationClean
     })
 
     await sendInteractiveList(from,
-        `📋 *Select Your Experience Level*
+        `📋 *Select Your Category*
 
-This determines which positions you can apply for:`,
-        'Choose Level',
+What type of work are you looking for?`,
+        'Choose Category',
         [
             {
-                title: '⚒️ Mining Positions',
+                title: '⚒️ Mining Categories',
                 rows: [
-                    { id: 'general_worker', title: '🔧 General Worker', description: 'Entry-level' },
-                    { id: 'semi_skilled', title: '⚙️ Semi-Skilled', description: 'Operators' },
-                    { id: 'skilled_worker', title: '👷 Skilled Worker', description: 'Artisans' },
-                    { id: 'professional', title: '👔 Professional', description: 'Engineers' }
+                    { id: 'general_worker', title: '🔧 General Worker', description: 'Entry-level positions' },
+                    { id: 'semi_skilled', title: '⚙️ Semi-Skilled', description: 'Operators & drillers' },
+                    { id: 'skilled', title: '👷 Skilled', description: 'Artisans & technicians' },
+                    { id: 'professional', title: '👔 Professional', description: 'Engineers & managers' }
                 ]
             }
         ]
@@ -354,7 +478,7 @@ This determines which positions you can apply for:`,
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HANDLE INTERACTIVE MESSAGE
+// NEW FLOW: STEP 6 - CATEGORY → TITLE SELECTION
 // ═══════════════════════════════════════════════════════════════
 async function handleInteractiveMessage(
     from: string,
@@ -366,9 +490,15 @@ async function handleInteractiveMessage(
 
     console.log(`Button: ${buttonId} (state: ${currentState})`)
 
-    // Experience level selection
-    if (currentState === 'APPLICANT_REG_SELECTING_LEVEL') {
-        await handleExperienceLevelSelection(from, buttonId, stateData)
+    // Category selection → Show titles
+    if (currentState === 'APPLICANT_REG_SELECTING_CATEGORY') {
+        await handleCategorySelection(from, buttonId, stateData)
+        return
+    }
+
+    // Title selection → Show required documents
+    if (currentState === 'APPLICANT_REG_SELECTING_TITLE') {
+        await handleTitleSelection(from, buttonId, stateData)
         return
     }
 
@@ -386,87 +516,94 @@ async function handleInteractiveMessage(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// EXPERIENCE LEVEL SELECTION
-// ═══════════════════════════════════════════════════════════════
-async function handleExperienceLevelSelection(from: string, level: string, stateData: any) {
-    const levelConfig = EXPERIENCE_LEVELS[level as keyof typeof EXPERIENCE_LEVELS]
+async function handleCategorySelection(from: string, category: string, stateData: any) {
+    // Get titles for this category
+    const titlesForCategory = JOB_TITLES.filter(job => job.category === category)
 
-    if (!levelConfig) {
-        await sendTextMessage(from, `❌ Invalid selection.`)
+    if (titlesForCategory.length === 0) {
+        await sendTextMessage(from, `❌ No titles found for this category.`)
         return
     }
 
-    const uploadState = `UPLOADING_${level.toUpperCase()}_DOCS` as ConversationState
-
-    await updateConversationState(from, uploadState, {
+    await updateConversationState(from, 'APPLICANT_REG_SELECTING_TITLE', {
         ...stateData,
-        experience_level: level,
-        pending_documents: levelConfig.required_documents,
-        uploaded_documents: {}  // ✅ Start with empty object
+        selected_category: category
     })
 
-    const docList = levelConfig.required_documents.map((doc, i) => `${i + 1}. ${doc}`).join('\n')
+    // Create interactive list with titles
+    const rows = titlesForCategory.map(job => ({
+        id: job.id,
+        title: job.title,
+        description: `${job.required_certificates.length} docs required`
+    }))
+
+    await sendInteractiveList(from,
+        `📋 *Select Your Job Title*
+
+Choose the position you're qualified for:`,
+        'Choose Title',
+        [
+            {
+                title: getCategoryLabel(category),
+                rows: rows.slice(0, 10) // WhatsApp limit: 10 items per section
+            }
+        ]
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NEW FLOW: STEP 7 - TITLE → REQUIRED DOCUMENTS
+// ═══════════════════════════════════════════════════════════════
+async function handleTitleSelection(from: string, titleId: string, stateData: any) {
+    const selectedJob = JOB_TITLES.find(job => job.id === titleId)
+
+    if (!selectedJob) {
+        await sendTextMessage(from, `❌ Invalid title selection.`)
+        return
+    }
+
+    // Get required documents (excluding ID Document which they already uploaded)
+    const requiredDocs = selectedJob.required_certificates.filter(
+        doc => doc !== 'ID Document'
+    )
+
+    await updateConversationState(from, 'UPLOADING_REQUIRED_DOCS', {
+        ...stateData,
+        selected_title_id: titleId,
+        selected_title: selectedJob.title,
+        selected_category: selectedJob.category,
+        pending_documents: requiredDocs,
+        uploaded_documents: {}
+    })
+
+    const docList = requiredDocs.map((doc, i) => `${i + 1}. ${doc}`).join('\n')
+
+    if (requiredDocs.length === 0) {
+        // No additional documents required
+        await sendTextMessage(from,
+            `✅ *${selectedJob.title}* selected!
+
+No additional documents required.
+
+Completing your registration...`)
+        
+        await completeApplicantRegistration(from, stateData)
+        return
+    }
 
     await sendTextMessage(from,
-        `✅ *${levelConfig.label}* selected!
+        `✅ *${selectedJob.title}* selected!
 
 📄 *Required Documents:*
 ${docList}
 
-Please upload: *${levelConfig.required_documents[0]}*
+Please upload: *${requiredDocs[0]}*
 
 Send as image or PDF (or type 'SKIP'):`)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HANDLE DOCUMENT UPLOAD
-// ═══════════════════════════════════════════════════════════════
-async function handleDocumentMessage(
-    from: string,
-    message: any,
-    currentState: ConversationState,
-    stateData: any
-) {
-    // ID Document upload
-    if (currentState === 'APPLICANT_REG_ID_UPLOAD') {
-        const imageId = message.image?.id || message.document?.id
-
-        if (!imageId) {
-            await sendTextMessage(from, `Please upload your ID as an image or PDF.`)
-            return
-        }
-
-        try {
-            console.log('📥 Downloading ID document as base64...')
-            
-            // ✅ Download as base64, store in conversation state (NOT in Supabase yet)
-            const docData = await downloadDocumentAsBase64(imageId, 'id_document')
-
-            await updateConversationState(from, 'APPLICANT_REG_EMAIL', {
-                ...stateData,
-                id_document: docData  // ✅ Store base64 in state
-            })
-
-            await sendTextMessage(from,
-                `✅ ID document received!
-
-📧 Please enter your *email address*:`)
-        } catch (error) {
-            console.error('❌ Upload failed:', error)
-            await sendTextMessage(from, `❌ Upload failed. Please try again.`)
-        }
-        return
-    }
-
-    // Other documents during registration
-    if (currentState.includes('UPLOADING_')) {
-        await processDocumentUpload(from, message, currentState, stateData)
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PROCESS DOCUMENT UPLOAD (STORES AS BASE64 IN STATE)
+// PROCESS DOCUMENT UPLOAD
 // ═══════════════════════════════════════════════════════════════
 async function processDocumentUpload(
     from: string,
@@ -490,19 +627,17 @@ async function processDocumentUpload(
     const currentDoc = pendingDocs[0]
 
     try {
-        console.log(`📥 Downloading ${currentDoc} as base64...`)
-        
-        // ✅ Download as base64, store in conversation state (NOT in Supabase yet)
+        console.log(`📥 Downloading ${currentDoc}...`)
         const docData = await downloadDocumentAsBase64(imageId, currentDoc)
 
         const uploadedDocs = stateData.uploaded_documents || {}
-        uploadedDocs[currentDoc] = docData  // ✅ Store base64 data
+        uploadedDocs[currentDoc] = docData
 
         const remainingDocs = pendingDocs.slice(1)
 
-        // ✅ If this was the last document, proceed to registration
+        // Last document? Complete registration
         if (remainingDocs.length === 0) {
-            console.log('✅ All documents collected! Starting registration...')
+            console.log('✅ All documents collected! Completing registration...')
             await completeApplicantRegistration(from, { 
                 ...stateData, 
                 uploaded_documents: uploadedDocs 
@@ -510,7 +645,7 @@ async function processDocumentUpload(
             return
         }
 
-        // ✅ Still have documents to upload - update state
+        // More documents needed
         await updateConversationState(from, currentState, {
             ...stateData,
             uploaded_documents: uploadedDocs,
@@ -529,21 +664,16 @@ Upload now (or type 'SKIP'):`)
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SKIP CURRENT DOCUMENT
-// ═══════════════════════════════════════════════════════════════
 async function skipCurrentDocument(from: string, currentState: ConversationState, stateData: any) {
     const pendingDocs = stateData.pending_documents || []
     const remainingDocs = pendingDocs.slice(1)
 
-    // ✅ If no more documents, proceed to registration
     if (remainingDocs.length === 0) {
-        console.log('✅ All documents processed! Starting registration...')
+        console.log('✅ All documents processed! Completing registration...')
         await completeApplicantRegistration(from, stateData)
         return
     }
 
-    // ✅ Still have documents - continue to next
     await updateConversationState(from, currentState, {
         ...stateData,
         pending_documents: remainingDocs
@@ -558,16 +688,13 @@ Upload now (or type 'SKIP'):`)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DOWNLOAD DOCUMENT AS BASE64 (NOT UPLOADED TO SUPABASE YET)
+// DOWNLOAD DOCUMENT AS BASE64
 // ═══════════════════════════════════════════════════════════════
 async function downloadDocumentAsBase64(
     mediaId: string,
     documentType: string
 ): Promise<{ base64: string; mimeType: string; fileName: string }> {
     try {
-        console.log('📥 [DOWNLOAD] Starting:', { mediaId, documentType })
-
-        // Step 1: Get media info from WhatsApp
         const mediaInfoResponse = await fetch(
             `https://graph.facebook.com/v22.0/${mediaId}`,
             {
@@ -578,18 +705,11 @@ async function downloadDocumentAsBase64(
         )
 
         if (!mediaInfoResponse.ok) {
-            const errorText = await mediaInfoResponse.text()
-            console.error('❌ [DOWNLOAD] WhatsApp API error:', errorText)
             throw new Error(`WhatsApp API error: ${mediaInfoResponse.status}`)
         }
 
         const mediaInfo = await mediaInfoResponse.json()
-        console.log('✅ [DOWNLOAD] Media info:', {
-            mimeType: mediaInfo.mime_type,
-            size: mediaInfo.file_size,
-        })
 
-        // Step 2: Download the actual file
         const mediaResponse = await fetch(mediaInfo.url, {
             headers: {
                 'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
@@ -601,17 +721,10 @@ async function downloadDocumentAsBase64(
         }
 
         const fileBuffer = await mediaResponse.arrayBuffer()
-        console.log('✅ [DOWNLOAD] File downloaded:', {
-            sizeKB: (fileBuffer.byteLength / 1024).toFixed(2),
-        })
-
-        // Step 3: Convert to base64 (for storing in conversation state)
         const base64 = Buffer.from(fileBuffer).toString('base64')
         
         const fileExtension = getFileExtension(mediaInfo.mime_type)
         const fileName = `${sanitizeFileName(documentType)}_${Date.now()}${fileExtension}`
-
-        console.log('✅ [DOWNLOAD] Converted to base64, stored in state')
 
         return {
             base64,
@@ -625,7 +738,7 @@ async function downloadDocumentAsBase64(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// COMPLETE REGISTRATION (NOW UPLOADS ALL DOCUMENTS TO STORAGE)
+// COMPLETE REGISTRATION (UPLOAD ALL DOCUMENTS NOW)
 // ═══════════════════════════════════════════════════════════════
 async function completeApplicantRegistration(from: string, stateData: any) {
     try {
@@ -633,9 +746,7 @@ async function completeApplicantRegistration(from: string, stateData: any) {
 
         console.log('🎯 [REGISTRATION] Starting final registration...')
 
-        // ═══════════════════════════════════════════════════════════
-        // STEP 1: Create auth user
-        // ═══════════════════════════════════════════════════════════
+        // Create auth user
         const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
             email: stateData.email,
             phone: from,
@@ -648,16 +759,9 @@ async function completeApplicantRegistration(from: string, stateData: any) {
             }
         })
 
-        if (authError) {
-            console.error('❌ Auth creation failed:', authError)
-            throw authError
-        }
+        if (authError) throw authError
 
-        console.log('✅ [REGISTRATION] Auth user created:', authUser.user.id)
-
-        // ═══════════════════════════════════════════════════════════
-        // STEP 2: Create base profile
-        // ═══════════════════════════════════════════════════════════
+        // Create base profile
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .insert({
@@ -670,16 +774,9 @@ async function completeApplicantRegistration(from: string, stateData: any) {
             .select()
             .single()
 
-        if (profileError) {
-            console.error('❌ Profile creation failed:', profileError)
-            throw profileError
-        }
+        if (profileError) throw profileError
 
-        console.log('✅ [REGISTRATION] Base profile created')
-
-        // ═══════════════════════════════════════════════════════════
-        // STEP 3: Create applicant profile
-        // ═══════════════════════════════════════════════════════════
+        // Create applicant profile
         const { data: applicant, error: applicantError } = await supabase
             .from('applicant_profiles')
             .insert({
@@ -692,43 +789,33 @@ async function completeApplicantRegistration(from: string, stateData: any) {
                 age: stateData.age,
                 whatsapp_number: from,
                 email_verified: true,
-                street_address: stateData.physical_address,
+                street_address: stateData.location,
                 available_immediately: true,
-                id_verified: true
+                id_verified: true,
+                job_title_id: stateData.selected_title_id
             })
             .select()
             .single()
 
-        if (applicantError) {
-            console.error('❌ Applicant profile creation failed:', applicantError)
-            throw applicantError
-        }
+        if (applicantError) throw applicantError
 
-        console.log('✅ [REGISTRATION] Applicant profile created')
-
-        // ═══════════════════════════════════════════════════════════
-        // ✅ STEP 4: NOW UPLOAD ALL DOCUMENTS TO SUPABASE STORAGE
-        // ═══════════════════════════════════════════════════════════
-        console.log('☁️ [REGISTRATION] NOW uploading documents to Supabase Storage...')
+        console.log('☁️ [REGISTRATION] NOW uploading all documents...')
         
-        // Combine ID document with other documents
+        // Combine all documents
         const allDocuments: Record<string, any> = {
             'ID Document': stateData.id_document,
+            'Selfie': stateData.selfie,
             ...(stateData.uploaded_documents || {})
         }
 
-        // Upload all documents to storage NOW
+        // Upload to Supabase Storage
         const documentUrls = await uploadAllDocumentsToStorage(
             allDocuments,
             applicant.id,
             supabase
         )
 
-        console.log('✅ [REGISTRATION] All documents uploaded to storage')
-
-        // ═══════════════════════════════════════════════════════════
-        // STEP 5: Link documents to applicant in database
-        // ═══════════════════════════════════════════════════════════
+        // Link documents to applicant
         if (Object.keys(documentUrls).length > 0) {
             const documentInserts = Object.entries(documentUrls).map(([docType, docUrl]) => ({
                 applicant_id: applicant.id,
@@ -739,43 +826,28 @@ async function completeApplicantRegistration(from: string, stateData: any) {
                 uploaded_at: new Date().toISOString()
             }))
 
-            const { error: docsError } = await supabase
-                .from('applicant_documents')
-                .insert(documentInserts)
-
-            if (docsError) {
-                console.error('⚠️ [REGISTRATION] Document linking failed:', docsError)
-            } else {
-                console.log('✅ [REGISTRATION] Documents linked to applicant')
-            }
+            await supabase.from('applicant_documents').insert(documentInserts)
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // STEP 6: Update conversation state
-        // ═══════════════════════════════════════════════════════════
         await updateConversationState(from, 'IDLE', {
             applicant_id: applicant.id,
             user_type: 'applicant' as any
         })
 
-        console.log('✅ [REGISTRATION] Registration complete!')
-
-        // ═══════════════════════════════════════════════════════════
-        // STEP 7: Send welcome email
-        // ═══════════════════════════════════════════════════════════
+        // Send welcome email
         try {
-            await sendWelcomeEmail(stateData.email, stateData.first_name, stateData.experience_level)
+            await sendWelcomeEmail(stateData.email, stateData.first_name, stateData.selected_category)
         } catch (e) {
-            console.error('⚠️ [REGISTRATION] Welcome email failed:', e)
+            console.error('⚠️ Welcome email failed:', e)
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // STEP 8: Send success message
-        // ═══════════════════════════════════════════════════════════
         await sendTextMessage(from,
             `🎉 *Registration Complete!*
 
 Welcome ${stateData.first_name}!
+
+Position: *${stateData.selected_title}*
+Location: ${stateData.location}
 
 You'll receive WhatsApp notifications when:
 • New jobs match your profile
@@ -795,74 +867,45 @@ Type 'JOBS' to see available positions!`)
         )
 
     } catch (error) {
-        console.error('❌ [REGISTRATION] Registration failed:', error)
-        
-        // ✅ On failure, everything stays in conversation state
+        console.error('❌ [REGISTRATION] Failed:', error)
         await sendTextMessage(from, 
-            `❌ Registration failed. Please type 'MENU' to try again or contact support.`)
+            `❌ Registration failed. Please type 'MENU' to try again.`)
     }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// UPLOAD ALL DOCUMENTS TO STORAGE (CALLED ONLY AT THE END)
+// UPLOAD ALL DOCUMENTS TO STORAGE
 // ═══════════════════════════════════════════════════════════════
 async function uploadAllDocumentsToStorage(
     documents: Record<string, { base64: string; mimeType: string; fileName: string }>,
     applicantId: string,
     supabase: any
 ): Promise<Record<string, string>> {
-    try {
-        console.log('☁️ [UPLOAD] Uploading documents:', {
-            count: Object.keys(documents).length,
-            applicantId,
-        })
+    const uploadedUrls: Record<string, string> = {}
 
-        const uploadedUrls: Record<string, string> = {}
+    for (const [docType, docData] of Object.entries(documents)) {
+        if (!docData || !docData.base64) continue
 
-        // Upload each document
-        for (const [docType, docData] of Object.entries(documents)) {
-            // Skip if no document data
-            if (!docData || !docData.base64) {
-                console.log(`⏭️ [UPLOAD] Skipping ${docType} (no data)`)
-                continue
-            }
+        const fileBuffer = Buffer.from(docData.base64, 'base64')
+        const storagePath = `${applicantId}/${docData.fileName}`
 
-            console.log(`📤 [UPLOAD] Uploading ${docType}...`)
+        const { error } = await supabase.storage
+            .from('applicant-documents')
+            .upload(storagePath, fileBuffer, {
+                contentType: docData.mimeType,
+                upsert: true,
+            })
 
-            // Convert base64 back to buffer
-            const fileBuffer = Buffer.from(docData.base64, 'base64')
-            
-            // Storage path
-            const storagePath = `${applicantId}/${docData.fileName}`
+        if (error) throw error
 
-            // Upload to Supabase Storage
-            const { data, error } = await supabase.storage
-                .from('applicant-documents')
-                .upload(storagePath, fileBuffer, {
-                    contentType: docData.mimeType,
-                    upsert: true,
-                })
+        const { data: urlData } = supabase.storage
+            .from('applicant-documents')
+            .getPublicUrl(storagePath)
 
-            if (error) {
-                console.error(`❌ [UPLOAD] Failed to upload ${docType}:`, error)
-                throw error
-            }
-
-            // Get public URL
-            const { data: urlData } = supabase.storage
-                .from('applicant-documents')
-                .getPublicUrl(storagePath)
-
-            uploadedUrls[docType] = urlData.publicUrl
-            console.log(`✅ [UPLOAD] ${docType} uploaded`)
-        }
-
-        console.log('✅ [UPLOAD] All documents uploaded successfully!')
-        return uploadedUrls
-    } catch (error) {
-        console.error('❌ [UPLOAD] Failed to upload documents:', error)
-        throw error
+        uploadedUrls[docType] = urlData.publicUrl
     }
+
+    return uploadedUrls
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -871,15 +914,12 @@ async function uploadAllDocumentsToStorage(
 function getFileExtension(mimeType: string): string {
     const mimeMap: Record<string, string> = {
         'image/jpeg': '.jpg',
-        'image/jpg': '.jpg',
         'image/png': '.png',
         'image/heic': '.heic',
-        'image/webp': '.webp',
         'application/pdf': '.pdf',
         'application/msword': '.doc',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
     }
-    
     return mimeMap[mimeType.toLowerCase()] || '.bin'
 }
 
@@ -894,17 +934,38 @@ function sanitizeFileName(name: string): string {
 function getDocumentTypeEnum(docName: string): string {
     const mapping: Record<string, string> = {
         'ID Document': 'id_document',
-        'Proof of Address': 'proof_of_address',
-        'Matric Certificate': 'matric_certificate',
-        'Trade Certificate': 'trade_certificate',
-        'Trade Test Certificate': 'trade_test_certificate',
-        'Blasting Certificate': 'blasting_certificate',
+        'Selfie': 'selfie',
         'Medical Certificate': 'medical_certificate',
-        'Degree/Diploma': 'degree',
+        'Drill Operator Certificate': 'drill_operator_certificate',
+        'Machine Operator License': 'machine_operator_license',
+        'Safety Certificate': 'safety_certificate',
+        'Winch Operator Certificate': 'winch_operator_certificate',
+        'Plant Operator License': 'plant_operator_license',
+        'Trade Test Certificate': 'trade_test_certificate',
+        'Wireman License': 'wireman_license',
+        'Welding Certificate': 'welding_certificate',
+        'Red Seal / Trade Test': 'red_seal',
+        'Engineering Degree': 'engineering_degree',
         'Professional Registration': 'professional_registration',
-        'CV': 'cv'
+        'Safety Management Certificate': 'safety_management_certificate',
+        'SAMTRAC': 'samtrac',
+        'Blasting Certificate': 'blasting_certificate',
+        'Supervisory Certificate': 'supervisory_certificate',
+        'Mine Managers Certificate': 'mine_managers_certificate',
+        'Mine Managers Certificate of Competency': 'mine_managers_certificate',
+        'Surveying Degree': 'surveying_degree',
     }
     return mapping[docName] || 'other'
+}
+
+function getCategoryLabel(category: string): string {
+    const labels: Record<string, string> = {
+        'general_worker': '🔧 General Worker Positions',
+        'semi_skilled': '⚙️ Semi-Skilled Positions',
+        'skilled': '👷 Skilled Positions',
+        'professional': '👔 Professional Positions'
+    }
+    return labels[category] || category
 }
 
 async function verifyWithHomeAffairs(idNumber: string) {
