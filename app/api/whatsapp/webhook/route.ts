@@ -4,8 +4,7 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 import {
     sendTextMessage,
     sendInteractiveButtons,
-    sendInteractiveList,
-    downloadAndStoreDocument
+    sendInteractiveList
 } from '@/lib/whatsapp/api'
 import {
     getConversationState,
@@ -25,6 +24,7 @@ import {
 } from '@/lib/email/mailgun'
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'justwork_mining_2025'
+const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN!
 
 // ═══════════════════════════════════════════════════════════════
 // EXPERIENCE LEVELS & REQUIRED DOCUMENTS
@@ -403,9 +403,7 @@ async function handleExperienceLevelSelection(from: string, level: string, state
         ...stateData,
         experience_level: level,
         pending_documents: levelConfig.required_documents,
-        uploaded_documents: {
-            'ID Document': stateData.id_document_url
-        }
+        uploaded_documents: {}  // ✅ Start with empty object
     })
 
     const docList = levelConfig.required_documents.map((doc, i) => `${i + 1}. ${doc}`).join('\n')
@@ -440,19 +438,22 @@ async function handleDocumentMessage(
         }
 
         try {
-            const docUrl = await downloadAndStoreDocument(imageId, 'id_document')
+            console.log('📥 Downloading ID document as base64...')
+            
+            // ✅ Download as base64, store in conversation state (NOT in Supabase yet)
+            const docData = await downloadDocumentAsBase64(imageId, 'id_document')
 
             await updateConversationState(from, 'APPLICANT_REG_EMAIL', {
                 ...stateData,
-                id_document_url: docUrl
+                id_document: docData  // ✅ Store base64 in state
             })
 
             await sendTextMessage(from,
-                `✅ ID document uploaded!
+                `✅ ID document received!
 
 📧 Please enter your *email address*:`)
         } catch (error) {
-            console.error('Upload failed:', error)
+            console.error('❌ Upload failed:', error)
             await sendTextMessage(from, `❌ Upload failed. Please try again.`)
         }
         return
@@ -464,6 +465,9 @@ async function handleDocumentMessage(
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PROCESS DOCUMENT UPLOAD (STORES AS BASE64 IN STATE)
+// ═══════════════════════════════════════════════════════════════
 async function processDocumentUpload(
     from: string,
     message: any,
@@ -486,18 +490,27 @@ async function processDocumentUpload(
     const currentDoc = pendingDocs[0]
 
     try {
-        const docUrl = await downloadAndStoreDocument(imageId, currentDoc, stateData.applicant_id)
+        console.log(`📥 Downloading ${currentDoc} as base64...`)
+        
+        // ✅ Download as base64, store in conversation state (NOT in Supabase yet)
+        const docData = await downloadDocumentAsBase64(imageId, currentDoc)
 
         const uploadedDocs = stateData.uploaded_documents || {}
-        uploadedDocs[currentDoc] = docUrl
+        uploadedDocs[currentDoc] = docData  // ✅ Store base64 data
 
         const remainingDocs = pendingDocs.slice(1)
 
+        // ✅ If this was the last document, proceed to registration
         if (remainingDocs.length === 0) {
-            await completeApplicantRegistration(from, { ...stateData, uploaded_documents: uploadedDocs })
+            console.log('✅ All documents collected! Starting registration...')
+            await completeApplicantRegistration(from, { 
+                ...stateData, 
+                uploaded_documents: uploadedDocs 
+            })
             return
         }
 
+        // ✅ Still have documents to upload - update state
         await updateConversationState(from, currentState, {
             ...stateData,
             uploaded_documents: uploadedDocs,
@@ -505,26 +518,32 @@ async function processDocumentUpload(
         })
 
         await sendTextMessage(from,
-            `✅ *${currentDoc}* uploaded!
+            `✅ *${currentDoc}* received!
 
 📄 Next: *${remainingDocs[0]}*
 
 Upload now (or type 'SKIP'):`)
     } catch (error) {
-        console.error('Upload failed:', error)
+        console.error('❌ Upload failed:', error)
         await sendTextMessage(from, `❌ Upload failed. Please try again.`)
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SKIP CURRENT DOCUMENT
+// ═══════════════════════════════════════════════════════════════
 async function skipCurrentDocument(from: string, currentState: ConversationState, stateData: any) {
     const pendingDocs = stateData.pending_documents || []
     const remainingDocs = pendingDocs.slice(1)
 
+    // ✅ If no more documents, proceed to registration
     if (remainingDocs.length === 0) {
+        console.log('✅ All documents processed! Starting registration...')
         await completeApplicantRegistration(from, stateData)
         return
     }
 
+    // ✅ Still have documents - continue to next
     await updateConversationState(from, currentState, {
         ...stateData,
         pending_documents: remainingDocs
@@ -539,13 +558,84 @@ Upload now (or type 'SKIP'):`)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// COMPLETE REGISTRATION
+// DOWNLOAD DOCUMENT AS BASE64 (NOT UPLOADED TO SUPABASE YET)
+// ═══════════════════════════════════════════════════════════════
+async function downloadDocumentAsBase64(
+    mediaId: string,
+    documentType: string
+): Promise<{ base64: string; mimeType: string; fileName: string }> {
+    try {
+        console.log('📥 [DOWNLOAD] Starting:', { mediaId, documentType })
+
+        // Step 1: Get media info from WhatsApp
+        const mediaInfoResponse = await fetch(
+            `https://graph.facebook.com/v22.0/${mediaId}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+                },
+            }
+        )
+
+        if (!mediaInfoResponse.ok) {
+            const errorText = await mediaInfoResponse.text()
+            console.error('❌ [DOWNLOAD] WhatsApp API error:', errorText)
+            throw new Error(`WhatsApp API error: ${mediaInfoResponse.status}`)
+        }
+
+        const mediaInfo = await mediaInfoResponse.json()
+        console.log('✅ [DOWNLOAD] Media info:', {
+            mimeType: mediaInfo.mime_type,
+            size: mediaInfo.file_size,
+        })
+
+        // Step 2: Download the actual file
+        const mediaResponse = await fetch(mediaInfo.url, {
+            headers: {
+                'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+            },
+        })
+
+        if (!mediaResponse.ok) {
+            throw new Error(`Failed to download file: ${mediaResponse.status}`)
+        }
+
+        const fileBuffer = await mediaResponse.arrayBuffer()
+        console.log('✅ [DOWNLOAD] File downloaded:', {
+            sizeKB: (fileBuffer.byteLength / 1024).toFixed(2),
+        })
+
+        // Step 3: Convert to base64 (for storing in conversation state)
+        const base64 = Buffer.from(fileBuffer).toString('base64')
+        
+        const fileExtension = getFileExtension(mediaInfo.mime_type)
+        const fileName = `${sanitizeFileName(documentType)}_${Date.now()}${fileExtension}`
+
+        console.log('✅ [DOWNLOAD] Converted to base64, stored in state')
+
+        return {
+            base64,
+            mimeType: mediaInfo.mime_type,
+            fileName,
+        }
+    } catch (error) {
+        console.error('❌ [DOWNLOAD] Download failed:', error)
+        throw error
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMPLETE REGISTRATION (NOW UPLOADS ALL DOCUMENTS TO STORAGE)
 // ═══════════════════════════════════════════════════════════════
 async function completeApplicantRegistration(from: string, stateData: any) {
     try {
         const supabase = getSupabaseServer()
 
-        // Create auth user first
+        console.log('🎯 [REGISTRATION] Starting final registration...')
+
+        // ═══════════════════════════════════════════════════════════
+        // STEP 1: Create auth user
+        // ═══════════════════════════════════════════════════════════
         const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
             email: stateData.email,
             phone: from,
@@ -558,14 +648,21 @@ async function completeApplicantRegistration(from: string, stateData: any) {
             }
         })
 
-        if (authError) throw authError
+        if (authError) {
+            console.error('❌ Auth creation failed:', authError)
+            throw authError
+        }
 
-        // Create base profile (required for foreign key)
+        console.log('✅ [REGISTRATION] Auth user created:', authUser.user.id)
+
+        // ═══════════════════════════════════════════════════════════
+        // STEP 2: Create base profile
+        // ═══════════════════════════════════════════════════════════
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .insert({
                 id: authUser.user.id,
-                user_type: 'applicant' as any, // ✅ Force TypeScript to accept it
+                user_type: 'applicant' as any,
                 email: stateData.email,
                 cellphone: from,
                 status: 'active' as any
@@ -573,9 +670,16 @@ async function completeApplicantRegistration(from: string, stateData: any) {
             .select()
             .single()
 
-        if (profileError) throw profileError
+        if (profileError) {
+            console.error('❌ Profile creation failed:', profileError)
+            throw profileError
+        }
 
-        // Create applicant profile
+        console.log('✅ [REGISTRATION] Base profile created')
+
+        // ═══════════════════════════════════════════════════════════
+        // STEP 3: Create applicant profile
+        // ═══════════════════════════════════════════════════════════
         const { data: applicant, error: applicantError } = await supabase
             .from('applicant_profiles')
             .insert({
@@ -595,20 +699,79 @@ async function completeApplicantRegistration(from: string, stateData: any) {
             .select()
             .single()
 
-        if (applicantError) throw applicantError
+        if (applicantError) {
+            console.error('❌ Applicant profile creation failed:', applicantError)
+            throw applicantError
+        }
 
+        console.log('✅ [REGISTRATION] Applicant profile created')
+
+        // ═══════════════════════════════════════════════════════════
+        // ✅ STEP 4: NOW UPLOAD ALL DOCUMENTS TO SUPABASE STORAGE
+        // ═══════════════════════════════════════════════════════════
+        console.log('☁️ [REGISTRATION] NOW uploading documents to Supabase Storage...')
+        
+        // Combine ID document with other documents
+        const allDocuments: Record<string, any> = {
+            'ID Document': stateData.id_document,
+            ...(stateData.uploaded_documents || {})
+        }
+
+        // Upload all documents to storage NOW
+        const documentUrls = await uploadAllDocumentsToStorage(
+            allDocuments,
+            applicant.id,
+            supabase
+        )
+
+        console.log('✅ [REGISTRATION] All documents uploaded to storage')
+
+        // ═══════════════════════════════════════════════════════════
+        // STEP 5: Link documents to applicant in database
+        // ═══════════════════════════════════════════════════════════
+        if (Object.keys(documentUrls).length > 0) {
+            const documentInserts = Object.entries(documentUrls).map(([docType, docUrl]) => ({
+                applicant_id: applicant.id,
+                document_type: getDocumentTypeEnum(docType),
+                document_name: docType,
+                document_url: docUrl,
+                status: 'pending' as any,
+                uploaded_at: new Date().toISOString()
+            }))
+
+            const { error: docsError } = await supabase
+                .from('applicant_documents')
+                .insert(documentInserts)
+
+            if (docsError) {
+                console.error('⚠️ [REGISTRATION] Document linking failed:', docsError)
+            } else {
+                console.log('✅ [REGISTRATION] Documents linked to applicant')
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // STEP 6: Update conversation state
+        // ═══════════════════════════════════════════════════════════
         await updateConversationState(from, 'IDLE', {
             applicant_id: applicant.id,
             user_type: 'applicant' as any
         })
 
-        // Send welcome email
+        console.log('✅ [REGISTRATION] Registration complete!')
+
+        // ═══════════════════════════════════════════════════════════
+        // STEP 7: Send welcome email
+        // ═══════════════════════════════════════════════════════════
         try {
             await sendWelcomeEmail(stateData.email, stateData.first_name, stateData.experience_level)
         } catch (e) {
-            console.error('Welcome email failed:', e)
+            console.error('⚠️ [REGISTRATION] Welcome email failed:', e)
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // STEP 8: Send success message
+        // ═══════════════════════════════════════════════════════════
         await sendTextMessage(from,
             `🎉 *Registration Complete!*
 
@@ -632,16 +795,119 @@ Type 'JOBS' to see available positions!`)
         )
 
     } catch (error) {
-        console.error('❌ Registration failed:', error)
-        await sendTextMessage(from, `❌ Registration failed. Please contact support.`)
+        console.error('❌ [REGISTRATION] Registration failed:', error)
+        
+        // ✅ On failure, everything stays in conversation state
+        await sendTextMessage(from, 
+            `❌ Registration failed. Please type 'MENU' to try again or contact support.`)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UPLOAD ALL DOCUMENTS TO STORAGE (CALLED ONLY AT THE END)
+// ═══════════════════════════════════════════════════════════════
+async function uploadAllDocumentsToStorage(
+    documents: Record<string, { base64: string; mimeType: string; fileName: string }>,
+    applicantId: string,
+    supabase: any
+): Promise<Record<string, string>> {
+    try {
+        console.log('☁️ [UPLOAD] Uploading documents:', {
+            count: Object.keys(documents).length,
+            applicantId,
+        })
+
+        const uploadedUrls: Record<string, string> = {}
+
+        // Upload each document
+        for (const [docType, docData] of Object.entries(documents)) {
+            // Skip if no document data
+            if (!docData || !docData.base64) {
+                console.log(`⏭️ [UPLOAD] Skipping ${docType} (no data)`)
+                continue
+            }
+
+            console.log(`📤 [UPLOAD] Uploading ${docType}...`)
+
+            // Convert base64 back to buffer
+            const fileBuffer = Buffer.from(docData.base64, 'base64')
+            
+            // Storage path
+            const storagePath = `${applicantId}/${docData.fileName}`
+
+            // Upload to Supabase Storage
+            const { data, error } = await supabase.storage
+                .from('applicant-documents')
+                .upload(storagePath, fileBuffer, {
+                    contentType: docData.mimeType,
+                    upsert: true,
+                })
+
+            if (error) {
+                console.error(`❌ [UPLOAD] Failed to upload ${docType}:`, error)
+                throw error
+            }
+
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from('applicant-documents')
+                .getPublicUrl(storagePath)
+
+            uploadedUrls[docType] = urlData.publicUrl
+            console.log(`✅ [UPLOAD] ${docType} uploaded`)
+        }
+
+        console.log('✅ [UPLOAD] All documents uploaded successfully!')
+        return uploadedUrls
+    } catch (error) {
+        console.error('❌ [UPLOAD] Failed to upload documents:', error)
+        throw error
     }
 }
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
+function getFileExtension(mimeType: string): string {
+    const mimeMap: Record<string, string> = {
+        'image/jpeg': '.jpg',
+        'image/jpg': '.jpg',
+        'image/png': '.png',
+        'image/heic': '.heic',
+        'image/webp': '.webp',
+        'application/pdf': '.pdf',
+        'application/msword': '.doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    }
+    
+    return mimeMap[mimeType.toLowerCase()] || '.bin'
+}
+
+function sanitizeFileName(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+}
+
+function getDocumentTypeEnum(docName: string): string {
+    const mapping: Record<string, string> = {
+        'ID Document': 'id_document',
+        'Proof of Address': 'proof_of_address',
+        'Matric Certificate': 'matric_certificate',
+        'Trade Certificate': 'trade_certificate',
+        'Trade Test Certificate': 'trade_test_certificate',
+        'Blasting Certificate': 'blasting_certificate',
+        'Medical Certificate': 'medical_certificate',
+        'Degree/Diploma': 'degree',
+        'Professional Registration': 'professional_registration',
+        'CV': 'cv'
+    }
+    return mapping[docName] || 'other'
+}
+
 async function verifyWithHomeAffairs(idNumber: string) {
-    // Mock - In production, integrate with Home Affairs API
     const idInfo = parseSAIDNumber(idNumber)
     return {
         verified: true,
