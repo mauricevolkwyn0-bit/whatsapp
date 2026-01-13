@@ -187,6 +187,9 @@ export async function POST(request: NextRequest) {
             await handleInteractiveMessage(from, message, currentState, stateData)
         } else if (messageType === 'image' || messageType === 'document') {
             await handleDocumentMessage(from, message, currentState, stateData)
+        } else if (messageType === 'location') {
+            // Handle location sharing
+            await handleLocationMessage(from, message, currentState, stateData)
         }
 
         return NextResponse.json({ success: true })
@@ -445,6 +448,32 @@ async function handleApplicantRegEmail(from: string, email: string, stateData: a
 📍 Please enter your *location* (city/town):
 
 Example: Johannesburg, Rustenburg, Kimberley`)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HANDLE LOCATION MESSAGE (WhatsApp location sharing)
+// ═══════════════════════════════════════════════════════════════
+async function handleLocationMessage(
+    from: string,
+    message: any,
+    currentState: ConversationState,
+    stateData: any
+) {
+    // If user shares their location during location step
+    if (currentState === 'APPLICANT_REG_LOCATION') {
+        const location = message.location
+        const locationString = `${location.latitude}, ${location.longitude}`
+        
+        // For now, just tell them to type their city name instead
+        await sendTextMessage(from,
+            `📍 Location received, but please type your *city/town name* instead:
+
+Example: Johannesburg, Rustenburg, Kimberley`)
+        return
+    }
+
+    // Ignore location messages in other states
+    console.log('⚠️ Location message received in unexpected state:', currentState)
 }
 
 // ═══════════════════════════════════════════════════════════════
