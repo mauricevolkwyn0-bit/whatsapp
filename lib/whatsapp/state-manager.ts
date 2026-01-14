@@ -16,9 +16,10 @@ export type ConversationState =
     | 'APPLICANT_REG_SELFIE'              // Step 3: Upload selfie
     | 'APPLICANT_REG_EMAIL'               // Step 4: Enter email
     | 'APPLICANT_REG_LOCATION'            // Step 5: Enter location
-    | 'APPLICANT_REG_SELECTING_CATEGORY'  // Step 6: Select category
-    | 'APPLICANT_REG_SELECTING_TITLE'     // Step 7: Select job title
-    | 'UPLOADING_REQUIRED_DOCS'           // Step 8: Upload required documents
+    | 'APPLICANT_REG_CV_UPLOAD'           // Step 6: Upload CV/Resume
+    | 'APPLICANT_REG_SELECTING_CATEGORY'  // Step 7: Select category
+    | 'APPLICANT_REG_SELECTING_TITLE'     // Step 8: Select job title
+    | 'UPLOADING_REQUIRED_DOCS'           // Step 9: Upload required documents
     
     // OLD STATES (kept for backwards compatibility)
     | 'APPLICANT_REG_ADDRESS'

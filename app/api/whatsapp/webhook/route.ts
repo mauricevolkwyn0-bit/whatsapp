@@ -238,6 +238,31 @@ async function handleTextMessage(
         case 'APPLICANT_REG_LOCATION':
             await handleApplicantRegLocation(from, text, stateData)
             break
+        
+        case 'APPLICANT_REG_CV_UPLOAD':
+            if (textLower === 'skip') {
+                await updateConversationState(from, 'APPLICANT_REG_SELECTING_CATEGORY', stateData)
+                await sendInteractiveList(from,
+                    `📋 *Select Your Category*
+
+What type of work are you looking for?`,
+                    'Choose Category',
+                    [
+                        {
+                            title: '⚒️ Mining Categories',
+                            rows: [
+                                { id: 'general_worker', title: '🔧 General Worker', description: 'Entry-level positions' },
+                                { id: 'semi_skilled', title: '⚙️ Semi-Skilled', description: 'Operators & drillers' },
+                                { id: 'skilled', title: '👷 Skilled', description: 'Artisans & technicians' },
+                                { id: 'professional', title: '👔 Professional', description: 'Engineers & managers' }
+                            ]
+                        }
+                    ]
+                )
+            } else {
+                await sendTextMessage(from, `📄 Please upload your *CV/Resume* as a PDF or clear image.\n\nOr type 'SKIP' to continue without it.`)
+            }
+            break
 
         case 'UPLOADING_REQUIRED_DOCS':
             if (textLower === 'skip') {
@@ -360,6 +385,45 @@ async function handleDocumentMessage(
 
     if (!imageId) {
         await sendTextMessage(from, `Please upload as an image or PDF.`)
+        return
+    }
+
+    // STEP 5B: CV/Resume upload → Category selection
+    if (currentState === 'APPLICANT_REG_CV_UPLOAD') {
+        try {
+            console.log('📥 Downloading CV/Resume...')
+            const docData = await downloadDocumentAsBase64(imageId, 'cv_resume')
+
+            const nextStateData = {
+                ...stateData,
+                cv_resume: docData
+            }
+
+            await updateConversationState(from, 'APPLICANT_REG_SELECTING_CATEGORY', nextStateData)
+
+            await sendTextMessage(from, `✅ CV/Resume received!`)
+
+            await sendInteractiveList(from,
+                `📋 *Select Your Category*
+
+What type of work are you looking for?`,
+                'Choose Category',
+                [
+                    {
+                        title: '⚒️ Mining Categories',
+                        rows: [
+                            { id: 'general_worker', title: '🔧 General Worker', description: 'Entry-level positions' },
+                            { id: 'semi_skilled', title: '⚙️ Semi-Skilled', description: 'Operators & drillers' },
+                            { id: 'skilled', title: '👷 Skilled', description: 'Artisans & technicians' },
+                            { id: 'professional', title: '👔 Professional', description: 'Engineers & managers' }
+                        ]
+                    }
+                ]
+            )
+        } catch (error) {
+            console.error('❌ Upload failed:', error)
+            await sendTextMessage(from, `❌ Upload failed. Please try again (or type 'SKIP' to continue).`)
+        }
         return
     }
 
@@ -542,28 +606,17 @@ async function reverseGeocodeToCityOrTown(lat: number, lon: number): Promise<str
 async function handleApplicantRegLocation(from: string, location: string, stateData: any) {
     const locationClean = sanitizeInput(location)
 
-    await updateConversationState(from, 'APPLICANT_REG_SELECTING_CATEGORY', {
+    await updateConversationState(from, 'APPLICANT_REG_CV_UPLOAD', {
         ...stateData,
         location: locationClean
     })
 
-    await sendInteractiveList(from,
-        `📋 *Select Your Category*
+    await sendTextMessage(from,
+        `✅ Location saved: ${locationClean}
 
-What type of work are you looking for?`,
-        'Choose Category',
-        [
-            {
-                title: '⚒️ Mining Categories',
-                rows: [
-                    { id: 'general_worker', title: '🔧 General Worker', description: 'Entry-level positions' },
-                    { id: 'semi_skilled', title: '⚙️ Semi-Skilled', description: 'Operators & drillers' },
-                    { id: 'skilled', title: '👷 Skilled', description: 'Artisans & technicians' },
-                    { id: 'professional', title: '👔 Professional', description: 'Engineers & managers' }
-                ]
-            }
-        ]
-    )
+📄 Please upload your *CV/Resume* (PDF or clear image).
+
+If you don't have it right now, type 'SKIP' to continue:`)
 }
 
 // ═══════════════════════════════════════════════════════════════
