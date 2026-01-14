@@ -463,18 +463,77 @@ async function handleLocationMessage(
     // If user shares their location during location step
     if (currentState === 'APPLICANT_REG_LOCATION') {
         const location = message.location
-        const locationString = `${location.latitude}, ${location.longitude}`
-        
-        // For now, just tell them to type their city name instead
-        await sendTextMessage(from,
-            `📍 Location received, but please type your *city/town name* instead:
+
+        if (!location) {
+            await sendTextMessage(from,
+                `📍 I couldn't read that location. Please type your *city/town name* instead:
 
 Example: Johannesburg, Rustenburg, Kimberley`)
+            return
+        }
+
+        // WhatsApp location payload may include name/address. Prefer those.
+        // Fallback to reverse-geocoding lat/lng if needed.
+        let derivedCityOrTown =
+            (typeof location.name === 'string' && location.name.trim()) ||
+            (typeof location.address === 'string' && location.address.trim()) ||
+            ''
+
+        if (!derivedCityOrTown && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+            derivedCityOrTown = await reverseGeocodeToCityOrTown(location.latitude, location.longitude)
+        }
+
+        if (!derivedCityOrTown) {
+            await sendTextMessage(from,
+                `📍 Location received, but I couldn't find the city/town from it.
+
+Please type your *city/town name* instead:
+
+Example: Johannesburg, Rustenburg, Kimberley`)
+            return
+        }
+
+        // Proceed as if they typed the location
+        await handleApplicantRegLocation(from, derivedCityOrTown, stateData)
         return
     }
 
     // Ignore location messages in other states
     console.log('⚠️ Location message received in unexpected state:', currentState)
+}
+
+async function reverseGeocodeToCityOrTown(lat: number, lon: number): Promise<string> {
+    try {
+        // Free reverse-geocode fallback (no API key). Best-effort only.
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+            String(lat)
+        )}&lon=${encodeURIComponent(String(lon))}&zoom=10&addressdetails=1`
+
+        const resp = await fetch(url, {
+            headers: {
+                // Nominatim requires a User-Agent / Referer in many deployments
+                'User-Agent': 'JustWorkMiningWhatsAppBot/1.0',
+            },
+        })
+
+        if (!resp.ok) return ''
+
+        const data: any = await resp.json()
+        const addr = data?.address || {}
+
+        // Common fields where "city/town" lives
+        const city =
+            addr.city ||
+            addr.town ||
+            addr.village ||
+            addr.suburb ||
+            addr.county ||
+            ''
+
+        return typeof city === 'string' ? city.trim() : ''
+    } catch {
+        return ''
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
