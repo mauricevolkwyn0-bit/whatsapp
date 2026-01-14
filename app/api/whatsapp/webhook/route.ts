@@ -238,6 +238,13 @@ async function handleTextMessage(
         case 'APPLICANT_REG_LOCATION':
             await handleApplicantRegLocation(from, text, stateData)
             break
+
+        case 'APPLICANT_REG_PROOF_OF_RESIDENCE_UPLOAD':
+            await sendTextMessage(
+                from,
+                `📄 Please upload your *Proof of Residence* (not older than *3 months*).\n\nYou can send a municipal bill, bank statement, or official letter (PDF or clear photo).`
+            )
+            break
         
         case 'APPLICANT_REG_CV_UPLOAD':
             if (textLower === 'skip') {
@@ -292,7 +299,7 @@ async function handleGreeting(from: string) {
 
 South Africa's leading mining recruitment platform 🇿🇦⛏️
 
-*Are you sure you will allow us to capture your personal information?*`,
+*Do you give us concent to capture your personal information and ID number?*`,
             [
                 { id: 'consent_yes', title: '✅ Yes' },
                 { id: 'consent_no', title: '❌ No' }
@@ -385,6 +392,30 @@ async function handleDocumentMessage(
 
     if (!imageId) {
         await sendTextMessage(from, `Please upload as an image or PDF.`)
+        return
+    }
+
+    // STEP 5A: Proof of residence upload → CV upload
+    if (currentState === 'APPLICANT_REG_PROOF_OF_RESIDENCE_UPLOAD') {
+        try {
+            console.log('📥 Downloading proof of residence...')
+            const docData = await downloadDocumentAsBase64(imageId, 'proof_of_residence')
+
+            await updateConversationState(from, 'APPLICANT_REG_CV_UPLOAD', {
+                ...stateData,
+                proof_of_residence: docData
+            })
+
+            await sendTextMessage(from,
+                `✅ Proof of residence received!
+
+📄 Now please upload your *CV/Resume* (PDF or clear image).
+
+If you don't have it right now, type 'SKIP' to continue:`)
+        } catch (error) {
+            console.error('❌ Upload failed:', error)
+            await sendTextMessage(from, `❌ Upload failed. Please try again.`)
+        }
         return
     }
 
@@ -606,7 +637,7 @@ async function reverseGeocodeToCityOrTown(lat: number, lon: number): Promise<str
 async function handleApplicantRegLocation(from: string, location: string, stateData: any) {
     const locationClean = sanitizeInput(location)
 
-    await updateConversationState(from, 'APPLICANT_REG_CV_UPLOAD', {
+    await updateConversationState(from, 'APPLICANT_REG_PROOF_OF_RESIDENCE_UPLOAD', {
         ...stateData,
         location: locationClean
     })
@@ -614,9 +645,9 @@ async function handleApplicantRegLocation(from: string, location: string, stateD
     await sendTextMessage(from,
         `✅ Location saved: ${locationClean}
 
-📄 Please upload your *CV/Resume* (PDF or clear image).
+📄 Please upload your *Proof of Residence* (not older than *3 months*).
 
-If you don't have it right now, type 'SKIP' to continue:`)
+You can send a municipal bill, bank statement, or official letter (PDF or clear photo):`)
 }
 
 // ═══════════════════════════════════════════════════════════════
