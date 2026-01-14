@@ -10,6 +10,7 @@ export type ConversationState =
     | 'CHOOSING_USER_TYPE'
     
     // ✅ NEW REGISTRATION FLOW
+    | 'APPLICANT_REG_CONSENT'             // Step 0: Consent to capture personal information
     | 'APPLICANT_REG_ID_NUMBER'           // Step 1: Enter ID number
     | 'APPLICANT_REG_ID_UPLOAD'           // Step 2: Upload ID document
     | 'APPLICANT_REG_SELFIE'              // Step 3: Upload selfie

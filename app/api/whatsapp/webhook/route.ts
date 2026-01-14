@@ -259,19 +259,20 @@ async function handleGreeting(from: string) {
     const applicant = await getApplicantByWhatsApp(from)
 
     if (!applicant) {
-        // NEW USER - Start registration
-        await updateConversationState(from, 'APPLICANT_REG_ID_NUMBER', {})
+        // NEW USER - Ask for consent first
+        await updateConversationState(from, 'APPLICANT_REG_CONSENT', {})
 
-        await sendTextMessage(from,
+        await sendInteractiveButtons(from,
             `👋 *Welcome to JustWork Mining!*
 
 South Africa's leading mining recruitment platform 🇿🇦⛏️
 
-Let's get you registered!
-
-Please enter your *13-digit SA ID number*:
-
-Example: 9201015800089`)
+*Are you sure you will allow us to capture your personal information?*`,
+            [
+                { id: 'consent_yes', title: '✅ Yes' },
+                { id: 'consent_no', title: '❌ No' }
+            ]
+        )
         return
     }
 
@@ -519,6 +520,12 @@ async function handleInteractiveMessage(
 
     console.log(`Button: ${buttonId} (state: ${currentState})`)
 
+    // Consent selection → Handle Yes/No
+    if (currentState === 'APPLICANT_REG_CONSENT') {
+        await handleConsentSelection(from, buttonId, stateData)
+        return
+    }
+
     // Category selection → Show titles
     if (currentState === 'APPLICANT_REG_SELECTING_CATEGORY') {
         await handleCategorySelection(from, buttonId, stateData)
@@ -542,6 +549,33 @@ async function handleInteractiveMessage(
         case 'update_profile':
             await startProfileUpdate(from, stateData)
             break
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NEW FLOW: CONSENT SELECTION
+// ═══════════════════════════════════════════════════════════════
+async function handleConsentSelection(from: string, buttonId: string, stateData: any) {
+    if (buttonId === 'consent_yes') {
+        // User consented - proceed to ID number
+        await updateConversationState(from, 'APPLICANT_REG_ID_NUMBER', {})
+        
+        await sendTextMessage(from,
+            `✅ Thank you for your consent!
+
+Let's get you registered!
+
+Please enter your *13-digit SA ID number*:
+
+Example: 9201015800089`)
+    } else if (buttonId === 'consent_no') {
+        // User declined - thank them and stop
+        await updateConversationState(from, 'IDLE', {})
+        
+        await sendTextMessage(from,
+            `Thank you for your interest in JustWork Mining!
+
+If you change your mind, feel free to message us anytime. 👋`)
     }
 }
 
